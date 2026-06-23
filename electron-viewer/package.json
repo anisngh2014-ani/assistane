@@ -1,0 +1,99 @@
+{
+  "name": "assistane-viewer",
+  "version": "1.0.0",
+  "description": "Assistane Viewer — Remote desktop viewer application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.assistane.viewer",
+    "productName": "Assistane Viewer",
+    "copyright": "Assistane",
+    "icon": "assets/icon.png",
+    "asar": true,
+    "compression": "maximum",
+    "electronVersion": "42.4.1",
+    "files": [
+      "**/*",
+      "!**/*.map",
+      "!**/*.md",
+      "!**/*.ts",
+      "!**/*.d.ts",
+      "!**/test/**",
+      "!**/tests/**",
+      "!**/__tests__/**",
+      "!**/docs/**",
+      "!**/doc/**",
+      "!**/example/**",
+      "!**/examples/**",
+      "!**/.github/**",
+      "!**/CHANGELOG*",
+      "!**/LICENSE*",
+      "!**/LICENCE*",
+      "!**/CONTRIBUTING*",
+      "!**/README*",
+      "!**/.npmignore",
+      "!**/.eslintrc*",
+      "!**/node_modules/**/*.map",
+      "!**/node_modules/**/*.md",
+      "!**/node_modules/**/test/**",
+      "!**/node_modules/**/tests/**",
+      "!**/node_modules/**/__tests__/**"
+    ],
+    "protocols": [
+      {
+        "name": "Assistane Viewer Protocol",
+        "schemes": [
+          "assistane"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "unicode": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "minimumSystemVersion": "10.13.0"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "assets/icon.png",
+      "category": "Utility"
+    }
+  }
+}

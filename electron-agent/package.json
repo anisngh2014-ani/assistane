@@ -1,0 +1,105 @@
+{
+  "name": "assistane-agent",
+  "version": "1.0.0",
+  "description": "Assistane background agent — registers device and sends heartbeats",
+  "author": "Assistane",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "rebuild": "electron-builder install-app-deps",
+    "build:win": "electron-builder --win --publish never",
+    "build:mac": "electron-builder --mac --publish never",
+    "build": "electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "@jitsi/robotjs": "^0.6.13",
+    "node-fetch": "^3.3.2",
+    "winreg": "^1.2.4"
+  },
+  "devDependencies": {
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.assistane.agent",
+    "productName": "Assistane Agent",
+    "icon": "assets/icon.png",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/@jitsi/robotjs/build/Release/*.node"
+    ],
+    "compression": "maximum",
+    "electronVersion": "42.4.1",
+    "files": [
+      "**/*",
+      "!**/*.map",
+      "!**/*.md",
+      "!**/*.ts",
+      "!**/*.d.ts",
+      "!**/test/**",
+      "!**/tests/**",
+      "!**/__tests__/**",
+      "!**/docs/**",
+      "!**/doc/**",
+      "!**/example/**",
+      "!**/examples/**",
+      "!**/.github/**",
+      "!**/CHANGELOG*",
+      "!**/LICENSE*",
+      "!**/LICENCE*",
+      "!**/CONTRIBUTING*",
+      "!**/README*",
+      "!**/Makefile",
+      "!**/*.gyp",
+      "!**/*.gypi",
+      "!**/binding.gyp",
+      "!**/.npmignore",
+      "!**/.eslintrc*",
+      "!**/node_modules/@jitsi/robotjs/build/Release/obj.target/**",
+      "!**/node_modules/@jitsi/robotjs/src/**",
+      "!**/node_modules/**/*.map",
+      "!**/node_modules/**/*.md",
+      "!**/node_modules/**/test/**",
+      "!**/node_modules/**/tests/**",
+      "!**/node_modules/**/__tests__/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "include": "install.nsh",
+      "unicode": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "minimumSystemVersion": "10.13.0",
+      "extendInfo": {
+        "NSScreenCaptureUsageDescription": "Assistane needs Screen Recording access to enable remote control of this Mac.",
+        "NSAccessibilityUsageDescription": "Assistane needs Accessibility access to control the mouse and keyboard during remote sessions."
+      }
+    }
+  }
+}

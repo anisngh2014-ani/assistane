@@ -1,0 +1,72 @@
+name: Build Assistane Agent
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: electron-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: electron-agent/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: npm ci
+      - name: Create build config
+        run: |
+          node -e "require('fs').writeFileSync('app-config.local.json', JSON.stringify({ API_BASE_URL: process.env.BASE44_DEVICE_API_URL || '', API_KEY: process.env.BASE44_DEVICE_API_KEY || '', HEARTBEAT_INTERVAL_MS: 30000 }, null, 2))"
+        env:
+          BASE44_DEVICE_API_URL: ${{ secrets.BASE44_DEVICE_API_URL }}
+          BASE44_DEVICE_API_KEY: ${{ secrets.BASE44_DEVICE_API_KEY }}
+      - run: npm run rebuild
+        env:
+          PYTHON: ${{ env.pythonLocation }}\python.exe
+      - run: npm run build:win
+        env:
+          PYTHON: ${{ env.pythonLocation }}\python.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: assistane-agent-windows
+          path: electron-agent/dist/*.exe
+
+  build-macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: electron-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: electron-agent/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: npm ci
+      - name: Create build config
+        run: |
+          node -e "require('fs').writeFileSync('app-config.local.json', JSON.stringify({ API_BASE_URL: process.env.BASE44_DEVICE_API_URL || '', API_KEY: process.env.BASE44_DEVICE_API_KEY || '', HEARTBEAT_INTERVAL_MS: 30000 }, null, 2))"
+        env:
+          BASE44_DEVICE_API_URL: ${{ secrets.BASE44_DEVICE_API_URL }}
+          BASE44_DEVICE_API_KEY: ${{ secrets.BASE44_DEVICE_API_KEY }}
+      - run: npm run rebuild
+        env:
+          PYTHON: ${{ env.pythonLocation }}/bin/python
+      - run: npm run build:mac
+        env:
+          PYTHON: ${{ env.pythonLocation }}/bin/python
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: assistane-agent-macos
+          path: electron-agent/dist/*.dmg

@@ -1,0 +1,124 @@
+{
+  "name": "Device",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Reference to User id"
+    },
+    "device_name": {
+      "type": "string"
+    },
+    "operating_system": {
+      "type": "string",
+      "enum": [
+        "Windows",
+        "macOS",
+        "Linux",
+        "Chrome OS",
+        "Other"
+      ]
+    },
+    "device_uid": {
+      "type": "string",
+      "description": "Unique device identifier"
+    },
+    "registration_token": {
+      "type": "string",
+      "description": "Token used for device registration"
+    },
+    "online_status": {
+      "type": "string",
+      "enum": [
+        "online",
+        "offline"
+      ],
+      "default": "offline"
+    },
+    "last_seen": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ip_address": {
+      "type": "string"
+    },
+    "last_screenshot_url": {
+      "type": "string",
+      "description": "URL of the last captured screenshot"
+    },
+    "black_screen": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, the target device shows a black screen lockout"
+    },
+    "black_screen_message": {
+      "type": "string",
+      "description": "Custom message shown on the black screen overlay"
+    },
+    "pending_command": {
+      "type": "string",
+      "enum": [
+        "reboot",
+        "lock",
+        ""
+      ],
+      "description": "Command pending execution on the device agent"
+    },
+    "remote_input_disabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, disables keyboard and mouse input from remote user"
+    },
+    "wallpaper_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "When false, hides wallpaper to improve performance"
+    },
+    "video_quality": {
+      "type": "string",
+      "enum": [
+        "ultra",
+        "high",
+        "medium",
+        "low"
+      ],
+      "default": "high",
+      "description": "Remote video streaming quality level"
+    },
+    "screen_width": {
+      "type": "number",
+      "description": "Current screen resolution width"
+    },
+    "screen_height": {
+      "type": "number",
+      "description": "Current screen resolution height"
+    },
+    "last_screen_update": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last screen resolution update"
+    },
+    "os_version": {
+      "type": "string",
+      "description": "Operating system version/release"
+    },
+    "ram_gb": {
+      "type": "number",
+      "description": "Total RAM in gigabytes"
+    },
+    "brand_name": {
+      "type": "string",
+      "description": "Device manufacturer/brand name"
+    },
+    "storage_gb": {
+      "type": "number",
+      "description": "Total storage in gigabytes"
+    }
+  },
+  "required": [
+    "user_id",
+    "device_name",
+    "operating_system",
+    "device_uid"
+  ]
+}

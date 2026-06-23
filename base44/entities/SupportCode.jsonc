@@ -1,0 +1,42 @@
+{
+  "name": "SupportCode",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Admin who generated this code"
+    },
+    "code": {
+      "type": "string",
+      "description": "Unique support code (UUID-based, never repeats)"
+    },
+    "short_code": {
+      "type": "string",
+      "description": "6-digit short code for user entry"
+    },
+    "pairing_token": {
+      "type": "string",
+      "description": "Internal registration secret. Do not display this in the UI."
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this code expires"
+    },
+    "used": {
+      "type": "boolean",
+      "default": false
+    },
+    "label": {
+      "type": "string",
+      "description": "Optional label e.g. client name"
+    }
+  },
+  "required": [
+    "user_id",
+    "code",
+    "short_code",
+    "pairing_token",
+    "expires_at"
+  ]
+}

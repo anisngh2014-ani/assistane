@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>RemotePilot — Screen Sharing</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1623; color: #c9d1e0; padding: 20px;
+      font-size: 12px; text-align: center;
+    }
+    h2 { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+      display: inline-block; margin-right: 6px; animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    #status { font-size: 11px; color: #6b7a99; margin-top: 6px; min-height: 16px; }
+    #log    { margin-top: 8px; font-size: 10px; color: #4a5570; font-family: monospace; }
+    .err    { color: #f87171 !important; }
+    .ok     { color: #34d399 !important; }
+  </style>
+</head>
+<body>
+  <h2><span class="dot"></span>Screen Sharing</h2>
+  <div id="status">Waiting for session request…</div>
+  <div id="log"></div>
+
+  <script>
+    /* eslint-disable */
+    "use strict";
+
+    const { ipcRenderer } = require("electron");
+
+    const statusEl = document.getElementById("status");
+    const logEl    = document.getElementById("log");
+
+    function setStatus(msg, type) {
+      statusEl.textContent = msg;
+      statusEl.className = type || "";
+      logEl.textContent = new Date().toLocaleTimeString() + " — " + msg;
+      console.log("[screen-share]", msg);
+    }
+
+    const RTC_CONFIG = {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+      ],
+      iceTransportPolicy: "all",
+    };
+
+    function waitForICE(pc) {
+      if (pc.iceGatheringState === "complete") return Promise.resolve();
+      return new Promise((resolve) => {
+        // Shorter timeout = faster connect (3s instead of 8s)
+        const timer = setTimeout(resolve, 3000);
+        const handler = () => {
+          if (pc.iceGatheringState === "complete") {
+            clearTimeout(timer);
+            pc.removeEventListener("icegatheringstatechange", handler);
+            resolve();
+          }
+        };
+        pc.addEventListener("icegatheringstatechange", handler);
+      });
+    }
+
+    async function parseApiJson(res, endpoint) {
+      const text = await res.text();
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        return text ? JSON.parse(text) : {};
+      }
+      const preview = text.replace(/\s+/g, " ").trim().slice(0, 160);
+      throw new Error(`API returned ${contentType || "non-JSON"} for ${endpoint}. Response: ${preview}`);
+    }
+
+    function shouldTryFunctionBodyFallback(status, data) {
+      const message = `${data?.message || data?.error || data?.detail || ""}`;
+      return (
+        status === 404 ||
+        status === 405 ||
+        /Backend function .*not found|not deployed|Method Not Allowed/i.test(message)
+      );
+    }
+
+    async function apiPost(apiBaseUrl, apiKey, endpoint, body) {
+      const baseUrl = apiBaseUrl.replace(/\/$/, "");
+      const headers = { "Content-Type": "application/json" };
+      if (apiKey) headers["x-api-key"] = apiKey;
+      const payload = { ...body, endpoint };
+      const urls = [`${baseUrl}/${endpoint}`, baseUrl];
+      let lastError = null;
+
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          });
+          const data = await parseApiJson(res, endpoint);
+          if (url !== baseUrl && shouldTryFunctionBodyFallback(res.status, data)) {
+            console.warn(`[api] POST ${endpoint} via ${url} returned ${res.status}; trying function body fallback`);
+            continue;
+          }
+          if (!res.ok) throw new Error(data?.error || `Backend HTTP ${res.status}`);
+          return data;
+        } catch (err) {
+          lastError = err;
+          console.warn(`[api] POST ${endpoint} via ${url} failed:`, err.message);
+        }
+      }
+
+      throw lastError;
+    }
+
+    let activePc     = null;
+    let activeStream = null;
+    // Map signalId -> pc so we can handle multiple concurrent sessions
+    const sessions = {};
+
+    function cleanup(signalId) {
+      if (signalId && sessions[signalId]) {
+        const { pc, stream } = sessions[signalId];
+        if (pc) pc.close();
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        delete sessions[signalId];
+        return;
+      }
+      // Fallback: clean all
+      Object.values(sessions).forEach(s => {
+        if (s.pc) s.pc.close();
+        if (s.stream) s.stream.getTracks().forEach(t => t.stop());
+      });
+      Object.keys(sessions).forEach(k => delete sessions[k]);
+    }
+
+    // ── Clipboard sync: send clipboard text to viewer on change ─────────────
+    let lastClipboard = "";
+    setInterval(async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text !== lastClipboard) {
+          lastClipboard = text;
+          // Notify all active data channels
+          Object.values(sessions).forEach(s => {
+            if (s.dc && s.dc.readyState === "open") {
+              s.dc.send(JSON.stringify({ type: "clipboard_from_target", text }));
+            }
+          });
+        }
+      } catch (_) {}
+    }, 1500);
+
+    // ── Main handler — invoked by main process via IPC ──────────────────────
+    ipcRenderer.on("start-sharing", async (_e, payload) => {
+      const { apiBaseUrl, apiKey, registrationToken, signalId, offerSdp, videoConstraints } = payload;
+
+      // Clean up previous session for this signalId if any
+      cleanup(signalId);
+
+      try {
+        // ── 1. Acquire screen stream ─────────────────────────────────────────
+        setStatus("Capturing display…");
+        const stream = await navigator.mediaDevices.getUserMedia(videoConstraints);
+
+        const [videoTrack] = stream.getVideoTracks();
+        const settings = videoTrack.getSettings();
+        setStatus(`Stream acquired — ${settings.width}×${settings.height} @ ${settings.frameRate}fps`);
+
+        // ── 2. Create RTCPeerConnection ──────────────────────────────────────
+        const pc = new RTCPeerConnection(RTC_CONFIG);
+        sessions[signalId] = { pc, stream, dc: null };
+
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+        // ── 3. Apply remote offer ────────────────────────────────────────────
+        await pc.setRemoteDescription({ type: "offer", sdp: offerSdp });
+        setStatus("Offer received — creating answer…");
+
+        // ── 4. Create + apply local answer ───────────────────────────────────
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        // ── 5. Wait for ICE (short 3s timeout) ───────────────────────────────
+        setStatus("Gathering ICE candidates…");
+        await waitForICE(pc);
+
+        // ── 6. POST answer to backend immediately ────────────────────────────
+        setStatus("Sending answer to server…");
+        await apiPost(apiBaseUrl, apiKey, "webrtc-answer", {
+          registration_token: registrationToken,
+          signal_id: signalId,
+          answer_sdp: pc.localDescription.sdp,
+        });
+
+        setStatus("✓ Streaming — P2P connection active", "ok");
+
+        // ── 7. Handle incoming DataChannel (control + clipboard) ─────────────
+        pc.ondatachannel = (event) => {
+          const dc = event.channel;
+          if (sessions[signalId]) sessions[signalId].dc = dc;
+          dc.onmessage = (msg) => {
+            try {
+              const data = JSON.parse(msg.data);
+              if (data.type === "key") {
+                ipcRenderer.send("key-event", data);
+              } else if (data.type === "file") {
+                ipcRenderer.send("file-drop", data);
+              } else if (data.type === "clipboard_to_target") {
+                // Write to local clipboard
+                navigator.clipboard.writeText(data.text).catch(() => {});
+                lastClipboard = data.text;
+              } else if (data.type === "screenshot_request") {
+                ipcRenderer.send("screenshot-request", { signalId, dc_label: dc.label });
+              } else {
+                ipcRenderer.send("mouse-event", data);
+              }
+            } catch (_) {}
+          };
+        };
+
+        // ── 8. Monitor connection health ─────────────────────────────────────
+        pc.onconnectionstatechange = () => {
+          const s = pc.connectionState;
+          console.log(`[webrtc] connectionState → ${s}`);
+          if (s === "connected") {
+            setStatus("✓ Peer connected — live stream active", "ok");
+          } else if (s === "disconnected" || s === "failed" || s === "closed") {
+            setStatus(`Session ended (${s})`);
+            cleanup(signalId);
+          }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+          console.log(`[webrtc] iceConnectionState → ${pc.iceConnectionState}`);
+        };
+
+      } catch (err) {
+        setStatus("Error: " + err.message, "err");
+        console.error("[screen-share] fatal:", err);
+        cleanup(signalId);
+      }
+    });
+
+    ipcRenderer.on("stop-sharing", (_e, signalId) => {
+      setStatus("Session stopped by server");
+      cleanup(signalId);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "name": "WebRTCSignal",
+  "type": "object",
+  "properties": {
+    "device_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "offer_sdp": {
+      "type": "string"
+    },
+    "answer_sdp": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "answered",
+        "connected",
+        "closed"
+      ],
+      "default": "pending"
+    }
+  },
+  "required": [
+    "device_id",
+    "user_id",
+    "offer_sdp"
+  ]
+}

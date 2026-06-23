@@ -1,0 +1,27 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "subscription_plan": {
+      "type": "string",
+      "enum": [
+        "free",
+        "pro",
+        "enterprise"
+      ],
+      "default": "free"
+    },
+    "agent_pairing_token": {
+      "type": "string",
+      "description": "Token the desktop agent uses to pair a new device to this user"
+    },
+    "created_by_id": {
+      "type": "string",
+      "description": "ID of the owner/admin who created this user account"
+    },
+    "workspace_id": {
+      "type": "string",
+      "description": "ID of the workspace this user belongs to (for white-label isolation)"
+    }
+  }
+}

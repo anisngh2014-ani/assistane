@@ -1,0 +1,37 @@
+{
+  "name": "Message",
+  "type": "object",
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "description": "Reference to Device id"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "Sender User id"
+    },
+    "sender_type": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "description": "Whether message is from admin or target user"
+    },
+    "content": {
+      "type": "string",
+      "description": "Message text"
+    },
+    "read": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether message has been read by recipient"
+    }
+  },
+  "required": [
+    "device_id",
+    "user_id",
+    "sender_type",
+    "content"
+  ]
+}

@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Assistane Viewer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #050508;
+      --card: #0d0d1a;
+      --border: rgba(255,255,255,0.08);
+      --primary: #e8508a;
+      --primary-hover: #f06a9a;
+      --text: #e8ecf4;
+      --muted: rgba(255,255,255,0.4);
+      --muted-dim: rgba(255,255,255,0.2);
+      --danger: #ef4444;
+      --success: #34d399;
+      --warning: #fbbf24;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* ── Splash / idle screen ────────────────────────────────── */
+    #splash {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 24px;
+      background: var(--bg);
+      z-index: 10;
+      transition: opacity 0.3s;
+    }
+    #splash.hidden { opacity: 0; pointer-events: none; }
+
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo-icon {
+      width: 48px; height: 48px; border-radius: 14px;
+      background: linear-gradient(135deg, var(--primary), #a855f7);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+    }
+    .logo-text { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+
+    .splash-status {
+      font-size: 13px; color: var(--muted);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 24px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Remote viewer layout ────────────────────────────────── */
+    #viewer-root {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      background: #000;
+    }
+
+    /* Top HUD */
+    #hud-top {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.92) 0%, transparent 100%);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    #hud-top.hidden { opacity: 0; pointer-events: none; transform: translateY(-8px); }
+
+    .hud-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .hud-center { display: flex; align-items: center; gap: 8px; }
+    .hud-right { display: flex; align-items: center; gap: 4px; }
+
+    .device-badge {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .device-icon {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: rgba(232,80,138,0.2); border: 1px solid rgba(232,80,138,0.3);
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+      flex-shrink: 0;
+    }
+    .device-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+    .device-os { font-size: 10px; color: var(--muted); }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
+    }
+    .status-pill.connected { background: rgba(52,211,153,0.15); color: var(--success); border: 1px solid rgba(52,211,153,0.25); }
+    .status-pill.connecting { background: rgba(251,191,36,0.15); color: var(--warning); border: 1px solid rgba(251,191,36,0.25); }
+    .status-pill.disconnected { background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid var(--border); }
+    .status-pill.reconnecting { background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.25); }
+
+    /* Quality bars */
+    .quality { display: flex; align-items: flex-end; gap: 2px; cursor: default; }
+    .quality-bar { width: 3px; border-radius: 2px; background: rgba(255,255,255,0.15); transition: background 0.3s; }
+
+    .hud-btn {
+      width: 32px; height: 32px; border-radius: 8px; border: none; cursor: pointer;
+      background: transparent; color: rgba(255,255,255,0.5); display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; font-size: 16px;
+    }
+    .hud-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .hud-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+    /* Bottom toolbar */
+    #hud-bottom {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 50;
+      background: linear-gradient(0deg, rgba(0,0,0,0.92) 0%, transparent 100%);
+      padding: 40px 16px 16px;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    #hud-bottom.hidden { opacity: 0; pointer-events: none; transform: translateY(8px); }
+
+    .toolbar { display: flex; align-items: center; justify-content: space-between; }
+    .tool-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+    .tool-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.65); cursor: pointer;
+      font-size: 10px; font-weight: 600; transition: all 0.15s; min-width: 52px;
+    }
+    .tool-btn svg { width: 16px; height: 16px; }
+    .tool-btn:hover { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.2); }
+    .tool-btn.active { background: rgba(232,80,138,0.2); color: var(--primary); border-color: rgba(232,80,138,0.4); }
+    .tool-btn.danger { background: rgba(239,68,68,0.12); color: #f87171; border-color: rgba(239,68,68,0.25); }
+    .tool-btn.danger:hover { background: rgba(239,68,68,0.22); }
+
+    .sep { width: 1px; height: 32px; background: rgba(255,255,255,0.12); margin: 0 2px; }
+
+    .end-btn {
+      display: flex; align-items: center; gap: 6px; padding: 8px 20px; border-radius: 10px;
+      border: none; cursor: pointer; font-size: 12px; font-weight: 700;
+      background: var(--danger); color: #fff; transition: all 0.15s;
+    }
+    .end-btn:hover { background: #dc2626; }
+
+    /* Side panel */
+    #side-panel {
+      position: absolute; right: 0; top: 0; bottom: 0; z-index: 60;
+      width: 300px; background: rgba(13,13,26,0.98);
+      border-left: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      display: flex; flex-direction: column;
+      transform: translateX(100%); transition: transform 0.25s ease;
+    }
+    #side-panel.open { transform: translateX(0); }
+
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.04); flex-shrink: 0;
+    }
+    .panel-title { font-size: 13px; font-weight: 700; }
+    .panel-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+    .panel-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .panel-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 20px; }
+
+    .section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.25); margin-bottom: 8px; }
+
+    .ctrl-btn {
+      display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.7); cursor: pointer;
+      font-size: 12px; font-weight: 500; transition: all 0.15s; text-align: left;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.09); color: #fff; border-color: rgba(255,255,255,0.15); }
+    .ctrl-btn.danger { background: rgba(239,68,68,0.08); color: #f87171; border-color: rgba(239,68,68,0.2); }
+    .ctrl-btn.danger:hover { background: rgba(239,68,68,0.18); }
+    .ctrl-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between; padding: 8px 4px;
+    }
+    .toggle-label { font-size: 12px; color: rgba(255,255,255,0.6); display: flex; align-items: center; gap: 8px; }
+    .toggle-label svg { width: 14px; height: 14px; }
+    .toggle {
+      position: relative; width: 40px; height: 20px; border-radius: 999px; cursor: pointer;
+      background: rgba(255,255,255,0.2); border: none; transition: background 0.2s;
+    }
+    .toggle.on { background: var(--primary); }
+    .toggle::after {
+      content: ""; position: absolute; top: 2px; left: 2px;
+      width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      transition: transform 0.2s;
+    }
+    .toggle.on::after { transform: translateX(20px); }
+
+    .res-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .res-btn {
+      padding: 6px 4px; border-radius: 8px; border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.6); cursor: pointer;
+      font-size: 11px; font-weight: 600; text-align: center; transition: all 0.15s;
+    }
+    .res-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+    .quality-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .q-btn {
+      padding: 7px 4px; border-radius: 8px; border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.5); cursor: pointer;
+      font-size: 11px; font-weight: 600; text-align: center; transition: all 0.15s; text-transform: capitalize;
+    }
+    .q-btn.active { background: rgba(232,80,138,0.2); color: var(--primary); border-color: rgba(232,80,138,0.4); }
+    .q-btn:hover:not(.active) { background: rgba(255,255,255,0.1); color: #fff; }
+
+    .clipboard-area { width: 100%; height: 72px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text); font-size: 12px; resize: none; outline: none; font-family: inherit; }
+    .clipboard-area:focus { border-color: var(--primary); }
+    .clip-btns { display: flex; gap: 8px; margin-top: 8px; }
+    .clip-btn {
+      flex: 1; padding: 7px; border-radius: 8px; border: 1px solid var(--border);
+      font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .clip-btn.read { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); }
+    .clip-btn.read:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .clip-btn.send { background: rgba(232,80,138,0.15); color: var(--primary); border-color: rgba(232,80,138,0.3); }
+    .clip-btn.send:hover { background: rgba(232,80,138,0.25); }
+    .clip-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .stat-row { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; }
+    .stat-label { color: var(--muted); }
+    .stat-val { font-family: monospace; font-weight: 600; }
+
+    /* ── Chat panel ────────────────────────────────────────── */
+    #chat-panel {
+      position: absolute; right: 0; top: 0; bottom: 0; z-index: 60;
+      width: 300px; background: rgba(13,13,26,0.98);
+      border-left: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      display: flex; flex-direction: column;
+      transform: translateX(100%); transition: transform 0.25s ease;
+    }
+    #chat-panel.open { transform: translateX(0); }
+
+    .chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .chat-msg { display: flex; }
+    .chat-msg.admin { justify-content: flex-end; }
+    .chat-bubble {
+      max-width: 85%; padding: 8px 12px; border-radius: 12px;
+      font-size: 12px; line-height: 1.5;
+    }
+    .chat-msg.admin .chat-bubble { background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+    .chat-msg.device .chat-bubble { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85); border-bottom-left-radius: 4px; }
+    .chat-sender { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; margin-bottom: 3px; }
+    .chat-input-area { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); }
+    .chat-input {
+      flex: 1; background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px 12px; color: var(--text); font-size: 12px; outline: none;
+    }
+    .chat-input:focus { border-color: var(--primary); }
+    .chat-send {
+      width: 36px; height: 36px; border-radius: 10px; border: none; cursor: pointer;
+      background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Video / center area ─────────────────────────────── */
+    #video-area { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #000; }
+
+    #remote-video {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: contain; background: #000;
+      opacity: 0; transition: opacity 0.4s; cursor: none;
+    }
+    #remote-video.visible { opacity: 1; }
+
+    /* Drop overlay */
+    #drop-overlay {
+      position: absolute; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(232,80,138,0.12); border: 4px dashed var(--primary);
+      pointer-events: none; opacity: 0; transition: opacity 0.2s;
+    }
+    #drop-overlay.active { opacity: 1; }
+    .drop-icon { font-size: 48px; margin-bottom: 12px; }
+    .drop-text { font-size: 20px; font-weight: 700; color: #fff; }
+    .drop-sub { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+
+    /* Disconnected / connecting splash */
+    #center-splash {
+      position: absolute; inset: 0; z-index: 15;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+      text-align: center; padding: 32px;
+    }
+    .device-avatar {
+      width: 80px; height: 80px; border-radius: 20px;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; font-size: 36px; position: relative;
+    }
+    .device-avatar .status-dot {
+      position: absolute; bottom: -4px; right: -4px;
+      width: 20px; height: 20px; border-radius: 50%; border: 3px solid #000;
+    }
+    .device-avatar .status-dot.online { background: var(--success); }
+    .device-avatar .status-dot.offline { background: var(--danger); }
+    .big-title { font-size: 22px; font-weight: 800; }
+    .big-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    .connect-btn {
+      display: flex; align-items: center; gap: 8px; padding: 12px 32px; border-radius: 12px;
+      border: none; cursor: pointer; font-size: 14px; font-weight: 700;
+      background: var(--primary); color: #fff; transition: all 0.15s;
+    }
+    .connect-btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+
+    /* Spinner ring */
+    .ring-container { position: relative; width: 80px; height: 80px; }
+    .ring-outer { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(232,80,138,0.2); animation: ping 1.5s infinite; }
+    .ring-inner { position: absolute; inset: 8px; border-radius: 50%; border: 2px solid rgba(232,80,138,0.35); animation: ping 1.5s 0.35s infinite; }
+    .ring-core { position: absolute; inset: 0; border-radius: 50%; background: #000; border: 1px solid rgba(232,80,138,0.3); display: flex; align-items: center; justify-content: center; font-size: 32px; }
+    @keyframes ping { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.25);opacity:0.3} }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Splash ──────────────────────────────────────────────── -->
+<div id="splash">
+  <div class="logo">
+    <div class="logo-icon">🖥️</div>
+    <div class="logo-text">Assistane Viewer</div>
+  </div>
+  <div class="splash-status">
+    <span class="dot"></span>
+    Waiting for a connection request…
+  </div>
+  <div style="font-size:12px;color:rgba(255,255,255,0.25);max-width:340px;text-align:center;line-height:1.6">
+    Click <strong style="color:rgba(255,255,255,0.5)">Connect</strong> on any device in your dashboard.<br/>
+    This viewer will launch the remote session automatically.
+  </div>
+</div>
+
+<!-- ── Viewer root (hidden until connected) ──────────────── -->
+<div id="viewer-root">
+
+  <!-- Top HUD -->
+  <div id="hud-top">
+    <div class="hud-left">
+      <button class="hud-btn" id="btn-back" title="Back to dashboard" onclick="goBack()">←</button>
+      <div style="width:1px;height:20px;background:var(--border)"></div>
+      <div class="device-badge">
+        <div class="device-icon">🖥️</div>
+        <div>
+          <div class="device-name" id="hud-device-name">—</div>
+          <div class="device-os" id="hud-device-os">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud-center">
+      <div class="status-pill disconnected" id="status-pill">
+        <span class="dot" style="background:rgba(255,255,255,0.3)"></span>
+        <span id="status-text">Disconnected</span>
+      </div>
+      <div class="quality" id="quality-indicator" title="Connection quality"></div>
+      <span id="elapsed-timer" style="font-size:11px;font-family:monospace;color:var(--muted);display:none"></span>
+    </div>
+
+    <div class="hud-right">
+      <button class="hud-btn" id="btn-fullscreen" title="Toggle Fullscreen" onclick="toggleFullscreen()">⛶</button>
+    </div>
+  </div>
+
+  <!-- Main video area -->
+  <div id="video-area">
+    <video id="remote-video" autoplay playsinline muted></video>
+
+    <div id="drop-overlay">
+      <div class="drop-icon">📤</div>
+      <div class="drop-text">Drop to send file</div>
+      <div class="drop-sub">File will be saved on the remote Desktop</div>
+    </div>
+
+    <!-- Center splash for disconnected / connecting states -->
+    <div id="center-splash">
+      <div class="device-avatar" id="center-avatar">
+        <span>🖥️</span>
+        <div class="status-dot online" id="center-status-dot"></div>
+      </div>
+      <div>
+        <div class="big-title" id="center-device-name">No Device Selected</div>
+        <div class="big-sub" id="center-sub">Open a dashboard and click Connect on any online device</div>
+      </div>
+      <button class="connect-btn" id="center-connect-btn" style="display:none" onclick="doConnect()">
+        📡 Connect
+      </button>
+      <button class="connect-btn" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);display:none" id="center-cancel-btn" onclick="doDisconnect()">
+        Cancel
+      </button>
+    </div>
+  </div>
+
+  <!-- Bottom toolbar (visible only when connected) -->
+  <div id="hud-bottom" class="hidden">
+    <div class="toolbar">
+      <div class="tool-group">
+        <button class="tool-btn" title="Ctrl+Alt+Del" onclick="sendCmd('send-special-key','ctrl-alt-del')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+          CAD
+        </button>
+        <button class="tool-btn" title="Alt+Tab" onclick="sendCmd('send-special-key','alt-tab')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v14a2 2 0 002 2h3M16 3h3a2 2 0 012 2v14a2 2 0 01-2 2h-3"/><path d="M12 8l4 4-4 4"/></svg>
+          Alt+Tab
+        </button>
+        <button class="tool-btn" title="Win+D" onclick="sendCmd('send-special-key','win-d')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+          Win+D
+        </button>
+        <button class="tool-btn" title="Paste Clipboard" onclick="pasteClipboard()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M8 4H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2"/></svg>
+          Paste
+        </button>
+        <button class="tool-btn" title="Lock Screen" onclick="sendCmd('lock-screen')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          Lock
+        </button>
+        <button class="tool-btn" id="btn-black-screen" title="Blank Screen" onclick="toggleBlackScreen()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg>
+          Blank
+        </button>
+        <div class="sep"></div>
+        <button class="tool-btn" id="btn-controls" title="Controls" onclick="togglePanel('controls')" style="position:relative">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          Controls
+        </button>
+        <button class="tool-btn" id="btn-chat" title="Chat" onclick="togglePanel('chat')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Chat
+          <span id="chat-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;width:16px;height:16px;border-radius:50%;display:none;align-items:center;justify-content:center;"></span>
+        </button>
+      </div>
+      <button class="end-btn" onclick="doDisconnect()">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64A9 9 0 115.64 17.36M2 12h10"/></svg>
+        End Session
+      </button>
+    </div>
+  </div>
+
+  <!-- Controls side panel -->
+  <div id="side-panel">
+    <div class="panel-header">
+      <span class="panel-title">Device Controls</span>
+      <button class="panel-close" onclick="togglePanel('controls')">×</button>
+    </div>
+    <div class="panel-body">
+
+      <section>
+        <div class="section-label">Special Keys</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="ctrl-btn" onclick="sendCmd('send-special-key','ctrl-alt-del')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+            Ctrl + Alt + Del
+          </button>
+          <button class="ctrl-btn" onclick="sendCmd('send-special-key','alt-tab')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M8 3H5a2 2 0 00-2 2v14a2 2 0 002 2h3M16 3h3a2 2 0 012 2v14a2 2 0 01-2 2h-3"/><path d="M12 8l4 4-4 4"/></svg>
+            Alt + Tab
+          </button>
+          <button class="ctrl-btn" onclick="sendCmd('send-special-key','win-d')">Win + D (Show Desktop)</button>
+          <button class="ctrl-btn" onclick="sendCmd('send-special-key','win-l')">Win + L (Lock Screen)</button>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-label">Power</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="ctrl-btn danger" onclick="confirmCmd('reboot-device','Reboot the remote device?')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+            Reboot
+          </button>
+          <button class="ctrl-btn danger" onclick="confirmCmd('reboot-device','Reboot in Safe Mode?',{safe_mode:true})">Reboot to Safe Mode</button>
+          <button class="ctrl-btn" onclick="sendCmd('lock-screen')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            Lock Screen
+          </button>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-label">Screen</div>
+        <button class="ctrl-btn" id="black-screen-ctrl-btn" onclick="toggleBlackScreen()">Show Black Screen</button>
+        <div style="margin-top:10px">
+          <div class="section-label" style="margin-bottom:6px">Resolution</div>
+          <div class="res-grid">
+            <button class="res-btn" onclick="setResolution(1920,1080)">FHD</button>
+            <button class="res-btn" onclick="setResolution(1440,900)">HD+</button>
+            <button class="res-btn" onclick="setResolution(1366,768)">HD</button>
+            <button class="res-btn" onclick="setResolution(1280,720)">720p</button>
+            <button class="res-btn" onclick="setResolution(1024,768)">XGA</button>
+            <button class="res-btn" onclick="setResolution(800,600)">SVGA</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-label">Settings</div>
+        <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:4px 12px;border:1px solid var(--border)">
+          <div class="toggle-row">
+            <span class="toggle-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg>
+              Disable Remote Input
+            </span>
+            <button class="toggle" id="toggle-input" onclick="toggleConfig('remote_input_disabled')"></button>
+          </div>
+          <div class="toggle-row" style="border-top:1px solid var(--border)">
+            <span class="toggle-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+              Show Wallpaper
+            </span>
+            <button class="toggle on" id="toggle-wallpaper" onclick="toggleConfig('wallpaper_enabled')"></button>
+          </div>
+          <div class="toggle-row" style="border-top:1px solid var(--border)">
+            <span class="toggle-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+              Auto Reconnect
+            </span>
+            <button class="toggle on" id="toggle-reconnect" onclick="toggleAutoReconnect()"></button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-label">Video Quality</div>
+        <div class="quality-grid">
+          <button class="q-btn" id="q-ultra" onclick="setQuality('ultra')">Ultra</button>
+          <button class="q-btn active" id="q-high" onclick="setQuality('high')">High</button>
+          <button class="q-btn" id="q-medium" onclick="setQuality('medium')">Med</button>
+          <button class="q-btn" id="q-low" onclick="setQuality('low')">Low</button>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-label">Clipboard Sync</div>
+        <textarea class="clipboard-area" id="clipboard-text" placeholder="Clipboard content…"></textarea>
+        <div class="clip-btns">
+          <button class="clip-btn read" onclick="readClipboard()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Read Local
+          </button>
+          <button class="clip-btn send" id="btn-send-clipboard" onclick="sendClipboard()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            Send to Device
+          </button>
+        </div>
+      </section>
+
+      <section id="stats-section" style="display:none">
+        <div class="section-label">Connection</div>
+        <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:8px 12px;border:1px solid var(--border)">
+          <div class="stat-row"><span class="stat-label">Latency</span><span class="stat-val" id="stat-rtt">—</span></div>
+          <div class="stat-row"><span class="stat-label">Packet Loss</span><span class="stat-val" id="stat-loss">—</span></div>
+          <div class="stat-row"><span class="stat-label">Data Received</span><span class="stat-val" id="stat-bytes">—</span></div>
+        </div>
+      </section>
+
+      <section id="device-info-section" style="display:none">
+        <div class="section-label">Device Info</div>
+        <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:8px 12px;border:1px solid var(--border);font-size:11px">
+          <div class="stat-row"><span class="stat-label">OS Version</span><span class="stat-val" id="info-os-version">—</span></div>
+          <div class="stat-row"><span class="stat-label">RAM</span><span class="stat-val" id="info-ram">—</span></div>
+          <div class="stat-row"><span class="stat-label">Storage</span><span class="stat-val" id="info-storage">—</span></div>
+          <div class="stat-row"><span class="stat-label">Brand</span><span class="stat-val" id="info-brand">—</span></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Chat panel -->
+  <div id="chat-panel">
+    <div class="panel-header">
+      <span class="panel-title">Message Device User</span>
+      <button class="panel-close" onclick="togglePanel('chat')">×</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div style="font-size:12px;color:rgba(255,255,255,0.25);text-align:center;padding:24px 0">No messages yet</div>
+    </div>
+    <div class="chat-input-area">
+      <input class="chat-input" id="chat-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendChat()" />
+      <button class="chat-send" id="chat-send-btn" onclick="sendChat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* eslint-disable */
+"use strict";
+
+const { ipcRenderer } = require("electron");
+const config = {}; // filled from main process
+
+// ── State ──────────────────────────────────────────────────────
+let currentDevice = null;
+let status = "idle"; // idle | disconnected | connecting | connected | reconnecting
+let pc = null;
+let dataChannel = null;
+let signalId = null;
+let sessionId = null;
+let elapsedSecs = 0;
+let elapsedTimer = null;
+let statsTimer = null;
+let chatPollTimer = null;
+let reconnectTimer = null;
+let autoReconnect = true;
+let blackScreenOn = false;
+let currentQuality = "high";
+let deviceConfig = { remote_input_disabled: false, wallpaper_enabled: true };
+let messages = [];
+let mouseThrottle = 0;
+let apiKey = "";
+let apiBaseUrl = "";
+
+// ── Init ──────────────────────────────────────────────────────
+ipcRenderer.invoke("get-config").then(cfg => {
+  apiBaseUrl = cfg.apiBaseUrl;
+  apiKey = cfg.apiKey;
+  if (!apiBaseUrl) setStatus("error", "Viewer API is not configured");
+  ipcRenderer.send("viewer-ready");
+});
+
+// ── Listen for connect-device from main process ───────────────
+ipcRenderer.on("connect-device", (_e, params) => {
+  startSession(params);
+});
+
+// ── API helpers ───────────────────────────────────────────────
+async function parseApiJson(res, endpoint) {
+  const text = await res.text();
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return text ? JSON.parse(text) : {};
+  }
+  const preview = text.replace(/\s+/g, " ").trim().slice(0, 160);
+  throw new Error(`API returned ${contentType || "non-JSON"} for ${endpoint}. Response: ${preview}`);
+}
+
+function shouldTryFunctionBodyFallback(status, data) {
+  const message = `${data?.message || data?.error || data?.detail || ""}`;
+  return (
+    status === 404 ||
+    status === 405 ||
+    /Backend function .*not found|not deployed|Method Not Allowed/i.test(message)
+  );
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRateLimited(status, data) {
+  const message = `${data?.message || data?.error || data?.detail || ""}`;
+  return status === 429 || /rate limit/i.test(message);
+}
+
+async function apiPost(endpoint, body) {
+  const baseUrl = apiBaseUrl.replace(/\/$/, "");
+  const headers = { "Content-Type": "application/json" };
+  if (apiKey) headers["x-api-key"] = apiKey;
+  const payload = { ...body, endpoint };
+  const urls = [`${baseUrl}/${endpoint}`, baseUrl];
+  let lastError = null;
+
+  for (const url of urls) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(15000),
+        });
+        const data = await parseApiJson(res, endpoint);
+        if (url !== baseUrl && shouldTryFunctionBodyFallback(res.status, data)) {
+          console.warn(`[api] POST ${endpoint} via ${url} returned ${res.status}; trying function body fallback`);
+          break;
+        }
+        if (!res.ok) {
+          const message = data?.detail || data?.message || data?.error || `HTTP ${res.status}`;
+          if (isRateLimited(res.status, data) && attempt < 3) {
+            const delay = [3000, 7000, 12000][attempt];
+            console.warn(`[api] POST ${endpoint} rate limited; retrying in ${Math.round(delay / 1000)}s`);
+            await sleep(delay);
+            continue;
+          }
+          throw new Error(`${endpoint} failed (${res.status}): ${message}`);
+        }
+        return data;
+      } catch (err) {
+        lastError = err;
+        console.warn(`[api] POST ${endpoint} via ${url} failed:`, err.message);
+        break;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+async function apiGet(endpoint, params = "") {
+  const baseUrl = apiBaseUrl.replace(/\/$/, "");
+  const url = `${baseUrl}/${endpoint}${params}`;
+  const headers = {};
+  if (apiKey) headers["x-api-key"] = apiKey;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(10000),
+      });
+      const data = await parseApiJson(res, endpoint);
+      if (!res.ok && shouldTryFunctionBodyFallback(res.status, data)) {
+        console.warn(`[api] GET ${endpoint} returned ${res.status}; trying function body fallback`);
+        break;
+      } else if (!res.ok) {
+        if (isRateLimited(res.status, data) && attempt < 3) {
+          const delay = [3000, 7000, 12000][attempt];
+          console.warn(`[api] GET ${endpoint} rate limited; retrying in ${Math.round(delay / 1000)}s`);
+          await sleep(delay);
+          continue;
+        }
+        throw new Error(`${endpoint} failed (${res.status}): ${data?.detail || data?.message || data?.error || "Request failed"}`);
+      } else {
+        return data;
+      }
+    } catch (err) {
+      console.warn(`[api] GET ${endpoint} failed:`, err.message);
+      throw err;
+    }
+  }
+
+  const body = {};
+  const query = params.startsWith("?") ? params.slice(1) : params;
+  for (const [key, value] of new URLSearchParams(query)) body[key] = value;
+  return apiPost(endpoint, body);
+}
+
+// ── WebRTC ────────────────────────────────────────────────────
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun.cloudflare.com:3478" },
+  ],
+};
+
+function waitForICE(peerConn) {
+  if (peerConn.iceGatheringState === "complete") return Promise.resolve();
+  return new Promise(resolve => {
+    const t = setTimeout(resolve, 3000);
+    const h = () => {
+      if (peerConn.iceGatheringState === "complete") { clearTimeout(t); peerConn.removeEventListener("icegatheringstatechange", h); resolve(); }
+    };
+    peerConn.addEventListener("icegatheringstatechange", h);
+  });
+}
+
+async function startSession(params) {
+  currentDevice = params;
+  hideSplash();
+  updateDeviceUI();
+  setStatus("disconnected");
+
+  // Show center splash with device info
+  document.getElementById("center-device-name").textContent = params.device_name;
+  document.getElementById("center-sub").textContent = "Device is online — connecting…";
+  document.getElementById("center-connect-btn").style.display = "none";
+
+  await doConnect();
+}
+
+async function doConnect() {
+  if (!currentDevice) return;
+  setStatus("connecting");
+
+  try {
+    const peerConn = new RTCPeerConnection(RTC_CONFIG);
+    pc = peerConn;
+
+    peerConn.ontrack = (e) => {
+      if (e.streams && e.streams[0]) {
+        const video = document.getElementById("remote-video");
+        video.srcObject = e.streams[0];
+        video.onloadedmetadata = () => {
+          video.classList.add("visible");
+          document.getElementById("center-splash").style.display = "none";
+        };
+      }
+    };
+
+    const dc = peerConn.createDataChannel("control", { ordered: true, maxRetransmits: 3 });
+    dataChannel = dc;
+
+    dc.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === "clipboard_from_target") {
+          document.getElementById("clipboard-text").value = data.text;
+          navigator.clipboard.writeText(data.text).catch(() => {});
+        }
+      } catch (_) {}
+    };
+
+    peerConn.onconnectionstatechange = () => {
+      const s = peerConn.connectionState;
+      console.log("[viewer] connectionState →", s);
+      if (s === "connected") {
+        setStatus("connected");
+        ipcRenderer.send("show-notification", { title: "Assistane Viewer", body: `Connected to ${currentDevice.device_name}` });
+        startStats();
+        startChatPoll();
+        createSession();
+      }
+      if (s === "disconnected" || s === "failed") {
+        if (autoReconnect) {
+          handleAutoReconnect();
+        } else {
+          doDisconnect();
+        }
+      }
+    };
+
+    const offer = await peerConn.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: false });
+    await peerConn.setLocalDescription(offer);
+    await waitForICE(peerConn);
+
+    // Push offer to backend — agent picks it up in ~1s
+    const result = await apiPost("create-signal", {
+      device_id: currentDevice.device_id,
+      auth_token: currentDevice.auth_token,
+      offer_sdp: peerConn.localDescription.sdp,
+    });
+
+    if (!result.success) throw new Error(result.detail || result.message || result.error || "Signal creation failed");
+    signalId = result.signal_id;
+
+    // Poll for the answer at a Base44-friendly pace.
+    const pollAnswer = setInterval(async () => {
+      try {
+        const ans = await apiGet("get-signal-answer", `?signal_id=${signalId}&auth_token=${encodeURIComponent(currentDevice.auth_token)}`);
+        if (ans.answer_sdp) {
+          clearInterval(pollAnswer);
+          await peerConn.setRemoteDescription({ type: "answer", sdp: ans.answer_sdp });
+        }
+      } catch (_) {}
+    }, 2000);
+
+    // Timeout
+    setTimeout(() => { clearInterval(pollAnswer); }, 30000);
+
+  } catch (err) {
+    console.error("[viewer] connect error:", err);
+    setStatus("disconnected");
+    document.getElementById("center-sub").textContent = "Connection failed: " + err.message;
+    document.getElementById("center-connect-btn").style.display = "flex";
+  }
+}
+
+function handleAutoReconnect() {
+  setStatus("reconnecting");
+  teardown(false);
+  reconnectTimer = setTimeout(() => doConnect(), 3000);
+}
+
+async function doDisconnect() {
+  clearTimeout(reconnectTimer);
+  teardown(true);
+  setStatus("disconnected");
+  document.getElementById("remote-video").classList.remove("visible");
+  document.getElementById("center-splash").style.display = "flex";
+  document.getElementById("center-sub").textContent = currentDevice ? "Session ended" : "Open a dashboard and click Connect";
+  document.getElementById("center-connect-btn").style.display = currentDevice ? "flex" : "none";
+  await endSession();
+}
+
+function teardown(clearDevice) {
+  clearInterval(statsTimer); statsTimer = null;
+  clearInterval(chatPollTimer); chatPollTimer = null;
+  if (dataChannel) { try { dataChannel.close(); } catch(_){} dataChannel = null; }
+  if (pc) { try { pc.close(); } catch(_){} pc = null; }
+  if (signalId) {
+    apiPost("close-signal", { signal_id: signalId, auth_token: currentDevice?.auth_token }).catch(() => {});
+    signalId = null;
+  }
+  clearInterval(elapsedTimer); elapsedTimer = null;
+  if (clearDevice) { elapsedSecs = 0; updateTimer(); }
+}
+
+// ── Session tracking ──────────────────────────────────────────
+async function createSession() {
+  try {
+    const res = await apiPost("create-session", {
+      device_id: currentDevice.device_id,
+      device_name: currentDevice.device_name,
+      auth_token: currentDevice.auth_token,
+    });
+    sessionId = res.session_id;
+    elapsedSecs = 0;
+    elapsedTimer = setInterval(() => { elapsedSecs++; updateTimer(); }, 1000);
+  } catch (_) {}
+}
+
+async function endSession() {
+  if (!sessionId) return;
+  try {
+    await apiPost("end-session", {
+      session_id: sessionId,
+      duration_minutes: Math.round(elapsedSecs / 60),
+      auth_token: currentDevice?.auth_token,
+    });
+  } catch (_) {}
+  sessionId = null;
+}
+
+// ── Status / UI ───────────────────────────────────────────────
+function setStatus(s) {
+  status = s;
+  const pill = document.getElementById("status-pill");
+  const textEl = document.getElementById("status-text");
+  const bottom = document.getElementById("hud-bottom");
+  const cancelBtn = document.getElementById("center-cancel-btn");
+  const connectBtn = document.getElementById("center-connect-btn");
+
+  pill.className = "status-pill " + s;
+  const texts = { idle: "Idle", disconnected: "Disconnected", connecting: "Connecting…", connected: "Live", reconnecting: "Reconnecting…" };
+  textEl.textContent = texts[s] || s;
+
+  const dotEl = pill.querySelector(".dot");
+  if (dotEl) {
+    const dotColors = { connected: "var(--success)", connecting: "var(--warning)", reconnecting: "#818cf8", disconnected: "rgba(255,255,255,0.3)", idle: "rgba(255,255,255,0.3)" };
+    dotEl.style.background = dotColors[s] || "rgba(255,255,255,0.3)";
+  }
+
+  bottom.classList.toggle("hidden", s !== "connected");
+  document.getElementById("elapsed-timer").style.display = s === "connected" ? "inline" : "none";
+  cancelBtn.style.display = (s === "connecting" || s === "reconnecting") ? "flex" : "none";
+  connectBtn.style.display = s === "disconnected" && currentDevice ? "flex" : "none";
+}
+
+function updateDeviceUI() {
+  if (!currentDevice) return;
+  document.getElementById("hud-device-name").textContent = currentDevice.device_name;
+  document.getElementById("hud-device-os").textContent = currentDevice.os + (currentDevice.ip ? " · " + currentDevice.ip : "");
+  document.getElementById("center-device-name").textContent = currentDevice.device_name;
+  
+  // Show device info section
+  document.getElementById("device-info-section").style.display = "block";
+  document.getElementById("info-os-version").textContent = currentDevice.os_version || "Unknown";
+  document.getElementById("info-ram").textContent = currentDevice.ram_gb ? currentDevice.ram_gb + " GB" : "Unknown";
+  document.getElementById("info-storage").textContent = currentDevice.storage_gb ? currentDevice.storage_gb + " GB" : "Unknown";
+  document.getElementById("info-brand").textContent = currentDevice.brand_name || "Unknown";
+}
+
+function updateTimer() {
+  const h = Math.floor(elapsedSecs / 3600), m = Math.floor((elapsedSecs % 3600) / 60), s = elapsedSecs % 60;
+  const str = h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}` : `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  document.getElementById("elapsed-timer").textContent = str;
+}
+
+function hideSplash() {
+  document.getElementById("splash").classList.add("hidden");
+  setTimeout(() => { document.getElementById("splash").style.display = "none"; }, 350);
+}
+
+// ── Quality indicator ─────────────────────────────────────────
+function startStats() {
+  statsTimer = setInterval(async () => {
+    if (!pc) return;
+    try {
+      const stats = await pc.getStats();
+      let rtt = 0, loss = 0, bytes = 0;
+      stats.forEach(r => {
+        if (r.type === "candidate-pair" && r.state === "succeeded") rtt = Math.round((r.currentRoundTripTime || 0) * 1000);
+        if (r.type === "inbound-rtp" && r.kind === "video") {
+          const lost = r.packetsLost || 0;
+          const total = (r.packetsReceived || 1) + lost;
+          loss = Math.round((lost / total) * 100);
+          bytes = r.bytesReceived || 0;
+        }
+      });
+      updateQualityUI(rtt, loss, bytes);
+    } catch (_) {}
+  }, 2000);
+}
+
+function updateQualityUI(rtt, loss, bytes) {
+  const q = rtt < 50 && loss < 1 ? 4 : rtt < 150 && loss < 5 ? 3 : rtt < 300 ? 2 : 1;
+  const colors = ["#f87171","#fbbf24","#86efac","#34d399"];
+  const color = colors[q - 1];
+  const el = document.getElementById("quality-indicator");
+  el.innerHTML = [1,2,3,4].map(b =>
+    `<div class="quality-bar" style="height:${b*4+2}px;background:${b<=q?color:"rgba(255,255,255,0.15)"};margin-bottom:0"></div>`
+  ).join("") + `<span style="font-size:10px;margin-left:4px;font-family:monospace;color:${color}">${rtt}ms</span>`;
+
+  document.getElementById("stats-section").style.display = "block";
+  document.getElementById("stat-rtt").textContent = rtt + "ms";
+  document.getElementById("stat-loss").style.color = loss > 5 ? "var(--danger)" : "var(--success)";
+  document.getElementById("stat-loss").textContent = loss + "%";
+  document.getElementById("stat-bytes").textContent = (bytes / 1024 / 1024).toFixed(1) + " MB";
+}
+
+// ── Panel toggle ──────────────────────────────────────────────
+let openPanel = null;
+function togglePanel(name) {
+  const panelId = name === "controls" ? "side-panel" : "chat-panel";
+  const otherId = name === "controls" ? "chat-panel" : "side-panel";
+  const panel = document.getElementById(panelId);
+  const other = document.getElementById(otherId);
+  other.classList.remove("open");
+  panel.classList.toggle("open");
+  openPanel = panel.classList.contains("open") ? name : null;
+
+  document.getElementById("btn-controls").classList.toggle("active", openPanel === "controls");
+  document.getElementById("btn-chat").classList.toggle("active", openPanel === "chat");
+}
+
+// ── Device commands ───────────────────────────────────────────
+async function sendCmd(endpoint, key, extra = {}) {
+  try {
+    const body = { device_id: currentDevice?.device_id, ...extra };
+    if (key !== undefined) body.key = key;
+    await apiPost(endpoint, body);
+  } catch (err) { console.error("[cmd]", err); }
+}
+
+async function confirmCmd(endpoint, msg, extra = {}) {
+  if (!confirm(msg)) return;
+  await apiPost(endpoint, { device_id: currentDevice?.device_id, ...extra });
+}
+
+async function toggleBlackScreen() {
+  blackScreenOn = !blackScreenOn;
+  await apiPost("black-screen", { device_id: currentDevice?.device_id, enabled: blackScreenOn, message: "This device has been locked by the administrator." });
+  document.getElementById("black-screen-ctrl-btn").textContent = blackScreenOn ? "Remove Black Screen" : "Show Black Screen";
+}
+
+async function toggleConfig(key) {
+  deviceConfig[key] = !deviceConfig[key];
+  document.getElementById("toggle-input").classList.toggle("on", deviceConfig.remote_input_disabled);
+  document.getElementById("toggle-wallpaper").classList.toggle("on", deviceConfig.wallpaper_enabled);
+  await apiPost("device-config", { device_id: currentDevice?.device_id, auth_token: currentDevice?.auth_token, [key]: deviceConfig[key] });
+}
+
+function toggleAutoReconnect() {
+  autoReconnect = !autoReconnect;
+  document.getElementById("toggle-reconnect").classList.toggle("on", autoReconnect);
+}
+
+async function setResolution(w, h) {
+  await apiPost("set-screen-resolution", { device_id: currentDevice?.device_id, auth_token: currentDevice?.auth_token, width: w, height: h });
+}
+
+async function setQuality(q) {
+  currentQuality = q;
+  ["ultra","high","medium","low"].forEach(k => document.getElementById("q-"+k)?.classList.remove("active"));
+  document.getElementById("q-"+q)?.classList.add("active");
+  await apiPost("device-config", { device_id: currentDevice?.device_id, auth_token: currentDevice?.auth_token, video_quality: q });
+}
+
+// ── Clipboard ─────────────────────────────────────────────────
+async function readClipboard() {
+  const text = await navigator.clipboard.readText().catch(() => "");
+  document.getElementById("clipboard-text").value = text;
+  document.getElementById("btn-send-clipboard").disabled = !text;
+}
+
+function sendClipboard() {
+  const text = document.getElementById("clipboard-text").value;
+  if (!dataChannel || dataChannel.readyState !== "open" || !text) return;
+  dataChannel.send(JSON.stringify({ type: "clipboard_to_target", text }));
+}
+
+async function pasteClipboard() {
+  const text = await navigator.clipboard.readText().catch(() => "");
+  if (!dataChannel || dataChannel.readyState !== "open" || !text) return;
+  dataChannel.send(JSON.stringify({ type: "clipboard_to_target", text }));
+}
+
+document.getElementById("clipboard-text").addEventListener("input", (e) => {
+  document.getElementById("btn-send-clipboard").disabled = !e.target.value;
+});
+
+// ── Chat ──────────────────────────────────────────────────────
+function startChatPoll() {
+  chatPollTimer = setInterval(loadMessages, 4000);
+  loadMessages();
+}
+
+async function loadMessages() {
+  if (!currentDevice) return;
+  try {
+    const data = await apiGet("messages", `?device_id=${currentDevice.device_id}&auth_token=${encodeURIComponent(currentDevice.auth_token)}`);
+    if (data.success) renderMessages(data.messages || []);
+  } catch (_) {}
+}
+
+function renderMessages(msgs) {
+  messages = msgs;
+  const el = document.getElementById("chat-messages");
+  if (!msgs.length) { el.innerHTML = '<div style="font-size:12px;color:rgba(255,255,255,0.25);text-align:center;padding:24px 0">No messages yet</div>'; return; }
+  el.innerHTML = msgs.map(m => `
+    <div class="chat-msg ${m.sender_type === "admin" ? "admin" : "device"}">
+      <div class="chat-bubble">
+        <div class="chat-sender">${m.sender_type === "admin" ? "You" : (currentDevice?.device_name || "Device")}</div>
+        ${m.content}
+      </div>
+    </div>
+  `).join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+async function sendChat() {
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text || !currentDevice) return;
+  input.value = "";
+  try {
+    await apiPost("send-message", { device_id: currentDevice.device_id, content: text, auth_token: currentDevice.auth_token });
+    await loadMessages();
+  } catch (err) { input.value = text; }
+}
+
+// ── Mouse / keyboard input ────────────────────────────────────
+const video = document.getElementById("remote-video");
+
+video.addEventListener("mousemove", (e) => {
+  const now = Date.now();
+  if (now - mouseThrottle < 20) return;
+  mouseThrottle = now;
+  sendInput("move", e);
+});
+video.addEventListener("mousedown", (e) => sendInput("click", e));
+video.addEventListener("mouseup", (e) => sendInput("mouseup", e));
+video.addEventListener("dblclick", (e) => sendInput("dblclick", e));
+video.addEventListener("contextmenu", (e) => { e.preventDefault(); sendInput("rightclick", e); });
+video.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  if (!dataChannel || dataChannel.readyState !== "open") return;
+  const rect = video.getBoundingClientRect();
+  dataChannel.send(JSON.stringify({ type: "scroll", x: (e.clientX-rect.left)/rect.width, y: (e.clientY-rect.top)/rect.height, deltaX: e.deltaX, deltaY: e.deltaY }));
+}, { passive: false });
+
+function sendInput(type, e) {
+  if (!dataChannel || dataChannel.readyState !== "open") return;
+  const rect = video.getBoundingClientRect();
+  dataChannel.send(JSON.stringify({ type, x: (e.clientX-rect.left)/rect.width, y: (e.clientY-rect.top)/rect.height, button: e.button }));
+}
+
+window.addEventListener("keydown", (e) => {
+  if (status !== "connected") return;
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+  if (!dataChannel || dataChannel.readyState !== "open") return;
+  e.preventDefault();
+  dataChannel.send(JSON.stringify({ type: "key", key: e.key, code: e.code, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }));
+}, true);
+
+// ── File drag-drop ────────────────────────────────────────────
+video.addEventListener("dragover", (e) => { e.preventDefault(); document.getElementById("drop-overlay").classList.add("active"); });
+video.addEventListener("dragleave", () => { document.getElementById("drop-overlay").classList.remove("active"); });
+video.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  document.getElementById("drop-overlay").classList.remove("active");
+  if (!dataChannel || dataChannel.readyState !== "open") return;
+  for (const file of Array.from(e.dataTransfer.files)) {
+    const formData = new FormData(); formData.append("file", file);
+    // Upload then send URL via data channel
+    const headers = {};
+    if (apiKey) headers["x-api-key"] = apiKey;
+    const res = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/upload-file`, {
+      method: "POST", headers, body: formData,
+    }).then(r => r.json()).catch(() => null);
+    if (res?.file_url) dataChannel.send(JSON.stringify({ type: "file", name: file.name, url: res.file_url }));
+  }
+});
+
+// ── Fullscreen ────────────────────────────────────────────────
+function toggleFullscreen() {
+  ipcRenderer.send("toggle-fullscreen");
+}
+
+function goBack() {
+  doDisconnect();
+  // Show splash again
+  document.getElementById("splash").style.display = "flex";
+  setTimeout(() => document.getElementById("splash").classList.remove("hidden"), 10);
+  document.getElementById("viewer-root").style.display = "none";
+  setTimeout(() => document.getElementById("viewer-root").style.display = "", 100);
+  currentDevice = null;
+}
+</script>
+</body>
+</html>

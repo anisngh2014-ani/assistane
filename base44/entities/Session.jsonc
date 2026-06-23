@@ -1,0 +1,44 @@
+{
+  "name": "Session",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Reference to User id"
+    },
+    "device_id": {
+      "type": "string",
+      "description": "Reference to Device id"
+    },
+    "device_name": {
+      "type": "string",
+      "description": "Device name snapshot at session time"
+    },
+    "session_start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "session_end": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Session duration in minutes"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed",
+        "disconnected"
+      ],
+      "default": "active"
+    }
+  },
+  "required": [
+    "user_id",
+    "device_id",
+    "session_start"
+  ]
+}
