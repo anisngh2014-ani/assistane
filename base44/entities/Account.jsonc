@@ -1,0 +1,81 @@
+{
+  "name": "Account",
+  "type": "object",
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "6-7 digit account identifier"
+    },
+    "username": {
+      "type": "string",
+      "description": "Account username (unique)"
+    },
+    "email": {
+      "type": "string",
+      "description": "Account email"
+    },
+    "password_hash": {
+      "type": "string",
+      "description": "Bcrypt hashed password"
+    },
+    "full_name": {
+      "type": "string",
+      "description": "Customer name"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "suspended"
+      ],
+      "default": "active"
+    },
+    "subscription_plan": {
+      "type": "string",
+      "enum": [
+        "free",
+        "basic",
+        "pro",
+        "enterprise"
+      ],
+      "default": "basic"
+    },
+    "subscription_expires": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the subscription expires"
+    },
+    "workspace_id": {
+      "type": "string",
+      "description": "Workspace this account belongs to"
+    },
+    "created_by_id": {
+      "type": "string",
+      "description": "Owner who created this account"
+    },
+    "max_devices": {
+      "type": "number",
+      "description": "Max devices allowed for this account",
+      "default": 5
+    },
+    "pairing_token": {
+      "type": "string",
+      "description": "Secret token embedded in installer URL (clients enter 6-digit code separately to resolve this token)"
+    },
+    "session_token": {
+      "type": "string",
+      "description": "Current customer dashboard session token"
+    },
+    "last_login_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last successful customer dashboard login"
+    }
+  },
+  "required": [
+    "username",
+    "email",
+    "password_hash"
+  ]
+}

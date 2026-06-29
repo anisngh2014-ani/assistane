@@ -1,0 +1,52 @@
+{
+  "name": "Session",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Owner account/user id for the remote device"
+    },
+    "requester_id": {
+      "type": "string",
+      "description": "Account/user id that started the session"
+    },
+    "requester_type": {
+      "type": "string",
+      "description": "Type of user that started the session: owner, customer, or viewer"
+    },
+    "device_id": {
+      "type": "string",
+      "description": "Reference to Device id"
+    },
+    "device_name": {
+      "type": "string",
+      "description": "Device name snapshot at session time"
+    },
+    "session_start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "session_end": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Session duration in minutes"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed",
+        "disconnected"
+      ],
+      "default": "active"
+    }
+  },
+  "required": [
+    "user_id",
+    "device_id",
+    "session_start"
+  ]
+}

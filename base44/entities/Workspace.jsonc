@@ -1,0 +1,42 @@
+{
+  "name": "Workspace",
+  "type": "object",
+  "properties": {
+    "owner_id": {
+      "type": "string",
+      "description": "ID of the workspace owner (reseller/technician)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Workspace name (company/brand name)"
+    },
+    "domain": {
+      "type": "string",
+      "description": "Custom domain for white-label (e.g., support.company.com)"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "Custom logo URL for branding"
+    },
+    "primary_color": {
+      "type": "string",
+      "description": "Primary brand color (hex, e.g., #FF6B6B)"
+    },
+    "secondary_color": {
+      "type": "string",
+      "description": "Secondary brand color (hex)"
+    },
+    "support_email": {
+      "type": "string",
+      "description": "Support contact email shown in app"
+    },
+    "max_devices": {
+      "type": "number",
+      "description": "Maximum devices allowed in workspace"
+    }
+  },
+  "required": [
+    "owner_id",
+    "name"
+  ]
+}
