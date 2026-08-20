@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assistane Agent Settings</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f1623;
+      color: #c9d1e0;
+      padding: 24px;
+      font-size: 13px;
+    }
+    h1 { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; display: inline-block; }
+    .sub { color: #6b7a99; font-size: 12px; margin-bottom: 20px; }
+    .card { background: #161d2e; border: 1px solid #232e44; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    .card h2 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #6b7a99; margin-bottom: 12px; }
+    .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 7px 0; border-bottom: 1px solid #1e2a3e; }
+    .row:last-child { border-bottom: none; }
+    .label { color: #6b7a99; }
+    .val { color: #e2e8f0; font-family: monospace; font-size: 12px; word-break: break-all; max-width: 285px; text-align: right; }
+    .badge { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .online { background: rgba(16,185,129,.15); color: #34d399; }
+    .offline { background: rgba(239,68,68,.1); color: #f87171; }
+    .btn { display: inline-flex; justify-content: center; align-items: center; width: 100%; margin-top: 12px; padding: 9px; background: #3b82f6; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn:hover { background: #2563eb; }
+    .btn.secondary { background: #232e44; color: #c9d1e0; }
+    .btn.secondary:hover { background: #2c3954; }
+    .inline-btn { width: auto; margin-top: 0; padding: 6px 10px; font-size: 12px; }
+    input[type="password"] { width: 100%; padding: 9px 10px; background: #0a0f1a; border: 1px solid #26334d; border-radius: 8px; color: #fff; outline: none; }
+    label.toggle { display: flex; align-items: center; gap: 8px; color: #e2e8f0; margin-bottom: 10px; }
+    .hint { color: #6b7a99; font-size: 12px; line-height: 1.5; margin-top: 8px; }
+    .message { min-height: 18px; margin-top: 8px; font-size: 12px; color: #34d399; }
+    .error { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1><span class="dot"></span> Assistane Agent</h1>
+  <p class="sub">Settings and unattended access</p>
+
+  <div class="card">
+    <h2>Status</h2>
+    <div class="row">
+      <span class="label">Connection</span>
+      <span id="status-badge" class="badge offline">Offline</span>
+    </div>
+    <div class="row">
+      <span class="label">Last Heartbeat</span>
+      <span class="val" id="last-hb">-</span>
+    </div>
+    <div class="row">
+      <span class="label">Interval</span>
+      <span class="val" id="interval">-</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Device</h2>
+    <div class="row">
+      <span class="label">Hostname</span>
+      <span class="val" id="hostname">-</span>
+    </div>
+    <div class="row">
+      <span class="label">Device UID</span>
+      <span class="val" id="device-uid">Not registered</span>
+    </div>
+    <div class="row">
+      <span class="label">Platform</span>
+      <span class="val" id="platform">-</span>
+    </div>
+    <div class="row">
+      <span class="label">API Endpoint</span>
+      <span class="val" id="api-url">-</span>
+    </div>
+  </div>
+
+  <div class="card" id="permission-card" style="display:none">
+    <h2>macOS Permissions</h2>
+    <div class="row">
+      <span class="label">Screen Recording</span>
+      <button class="btn secondary inline-btn" onclick="openPermission('screen')" id="screen-perm">Open</button>
+    </div>
+    <div class="row">
+      <span class="label">Accessibility</span>
+      <button class="btn secondary inline-btn" onclick="openPermission('accessibility')" id="accessibility-perm">Open</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Unattended Access</h2>
+    <label class="toggle">
+      <input type="checkbox" id="unattended-enabled" />
+      Enable unattended access for this device
+    </label>
+    <input id="unattended-password" type="password" placeholder="New unattended access password" />
+    <p class="hint">Password is stored as a salted hash on this computer. Remote sessions remain visible in the Agent tray/status and are logged.</p>
+    <button class="btn" onclick="saveUnattended()">Save Unattended Access</button>
+    <div class="message" id="unattended-message"></div>
+  </div>
+
+  <button class="btn secondary" onclick="window.close()">Close</button>
+
+  <script>
+    const { ipcRenderer } = require("electron");
+
+    async function refreshStatus() {
+      const s = await ipcRenderer.invoke("agent-status");
+      const badge = document.getElementById("status-badge");
+      badge.textContent = s.online ? "Online" : "Offline";
+      badge.className = "badge " + (s.online ? "online" : "offline");
+      document.getElementById("last-hb").textContent = s.lastHeartbeat ? new Date(s.lastHeartbeat).toLocaleTimeString() : "-";
+      document.getElementById("interval").textContent = `${s.heartbeatIntervalSeconds}s`;
+      document.getElementById("hostname").textContent = s.hostname || "-";
+      document.getElementById("platform").textContent = s.platform || "-";
+      document.getElementById("api-url").textContent = s.apiBaseUrl || "-";
+      document.getElementById("device-uid").textContent = s.device?.uid || "Not registered";
+
+      if (s.macPermissions) {
+        document.getElementById("permission-card").style.display = "block";
+        document.getElementById("screen-perm").textContent = s.macPermissions.screen === "granted" ? "Granted" : "Open";
+        document.getElementById("accessibility-perm").textContent = s.macPermissions.accessibility ? "Granted" : "Open";
+      }
+    }
+
+    async function refreshUnattended() {
+      const settings = await ipcRenderer.invoke("get-unattended-access");
+      document.getElementById("unattended-enabled").checked = settings.enabled === true;
+      if (settings.updatedAt) {
+        document.getElementById("unattended-message").textContent = `Last updated ${new Date(settings.updatedAt).toLocaleString()}`;
+      }
+    }
+
+    async function saveUnattended() {
+      const enabled = document.getElementById("unattended-enabled").checked;
+      const password = document.getElementById("unattended-password").value;
+      const message = document.getElementById("unattended-message");
+      message.className = "message";
+      message.textContent = "Saving...";
+      const res = await ipcRenderer.invoke("save-unattended-access", { enabled, password });
+      if (!res.success) {
+        message.className = "message error";
+        message.textContent = res.error || "Could not save unattended access.";
+        return;
+      }
+      document.getElementById("unattended-password").value = "";
+      message.textContent = enabled ? "Unattended access enabled." : "Unattended access disabled.";
+    }
+
+    function openPermission(permission) {
+      ipcRenderer.invoke("open-mac-permission", permission);
+    }
+
+    refreshStatus();
+    refreshUnattended();
+    setInterval(refreshStatus, 5000);
+  </script>
+</body>
+</html>

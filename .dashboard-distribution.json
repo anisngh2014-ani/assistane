@@ -1,0 +1,76 @@
+{
+  "CallerReference": "assistane-dashboard-20260820134521",
+  "Origins": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "S3OriginConfig": {
+          "OriginAccessIdentity": ""
+        },
+        "DomainName": "assistane-remote-prod-dashboard-339713106066-us-east-1.s3.us-east-1.amazonaws.com",
+        "OriginAccessControlId": "E3GXWUFJOPFMX1",
+        "Id": "assistane-dashboard-s3"
+      }
+    ]
+  },
+  "CustomErrorResponses": {
+    "Quantity": 2,
+    "Items": [
+      {
+        "ResponsePagePath": "/index.html",
+        "ErrorCachingMinTTL": 0,
+        "ResponseCode": "200",
+        "ErrorCode": 403
+      },
+      {
+        "ResponsePagePath": "/index.html",
+        "ErrorCachingMinTTL": 0,
+        "ResponseCode": "200",
+        "ErrorCode": 404
+      }
+    ]
+  },
+  "Enabled": true,
+  "PriceClass": "PriceClass_100",
+  "Restrictions": {
+    "GeoRestriction": {
+      "Quantity": 0,
+      "RestrictionType": "none"
+    }
+  },
+  "Comment": "Assistane Remote dashboard",
+  "ViewerCertificate": {
+    "CloudFrontDefaultCertificate": true
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "assistane-dashboard-s3",
+    "MaxTTL": 3600,
+    "DefaultTTL": 300,
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "MinTTL": 0,
+    "ForwardedValues": {
+      "QueryString": false,
+      "Cookies": {
+        "Forward": "none"
+      }
+    },
+    "Compress": true,
+    "AllowedMethods": {
+      "Quantity": 2,
+      "Items": [
+        "GET",
+        "HEAD"
+      ],
+      "CachedMethods": {
+        "Quantity": 2,
+        "Items": [
+          "GET",
+          "HEAD"
+        ]
+      }
+    }
+  },
+  "IsIPV6Enabled": true,
+  "DefaultRootObject": "index.html",
+  "HttpVersion": "http2"
+}

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connect Device</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f1623; color: #c9d1e0; padding: 28px; font-size: 13px;
+    }
+    h1 { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .sub { color: #6b7a99; font-size: 12px; margin-bottom: 22px; line-height: 1.5; }
+    label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: .08em; color: #6b7a99; margin-bottom: 8px; }
+    input { width: 100%; padding: 11px 12px; background: #161d2e; border: 1px solid #232e44;
+            border-radius: 8px; color: #fff; font-family: monospace; font-size: 13px; outline: none; }
+    input:focus { border-color: #3b82f6; }
+    .btn { display: block; width: 100%; margin-top: 18px; padding: 11px; background: #3b82f6;
+           color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn:hover { background: #2563eb; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .hint { margin-top: 14px; font-size: 11px; color: #6b7a99; line-height: 1.5; }
+    .err { margin-top: 12px; font-size: 12px; color: #f87171; min-height: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Connect this device</h1>
+  <p class="sub">Open Assistane in your browser, go to <b>Add a Device</b>, and copy your 6-digit support code. Paste it below to link this computer to your account.</p>
+
+  <label for="token">6-Digit Support Code</label>
+  <input id="token" type="text" placeholder="000000 or support link" maxlength="240" autocomplete="off" autofocus />
+  <div class="err" id="err"></div>
+
+  <button class="btn" id="submit">Connect Device</button>
+  <p class="hint">Once connected, this device will appear on your dashboard and the agent will run quietly in the background.</p>
+
+  <script>
+    const { ipcRenderer } = require("electron");
+    const input = document.getElementById("token");
+    const btn = document.getElementById("submit");
+    const err = document.getElementById("err");
+
+    function submit() {
+      const token = input.value.trim();
+      if (!token) { err.textContent = "Please enter your support code."; return; }
+      err.textContent = "";
+      btn.disabled = true;
+      input.disabled = true;
+      btn.textContent = "Connecting…";
+      ipcRenderer.send("submit-pairing-token", token);
+    }
+
+    btn.addEventListener("click", submit);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+
+    ipcRenderer.on("pairing-status", (_e, message) => {
+      err.textContent = "";
+      btn.disabled = true;
+      input.disabled = true;
+      btn.textContent = message || "Connecting...";
+    });
+
+    ipcRenderer.on("pairing-error", (_e, message) => {
+      err.style.color = "#f87171";
+      err.textContent = message || "Could not connect. Please check the code and try again.";
+      btn.disabled = false;
+      input.disabled = false;
+      btn.textContent = "Connect Device";
+      input.focus();
+      input.select();
+    });
+
+    ipcRenderer.on("pairing-success", (_e, message) => {
+      err.style.color = "#34d399";
+      err.textContent = message || "Device connected.";
+      btn.textContent = "Connected";
+    });
+  </script>
+</body>
+</html>

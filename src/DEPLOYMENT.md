@@ -1,0 +1,1 @@
+# Assistane Deployment`n`nAssistane is now migrated away from Base44. Use the AWS deployment files in `/aws-assistane` for API, dashboard, and DNS setup.`n

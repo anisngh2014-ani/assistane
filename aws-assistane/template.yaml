@@ -1,0 +1,348 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Assistane Remote AWS environment. Separate from ProtecVox.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: assistane-remote-dev
+  OwnerAdminSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 24
+  DesktopApiKey:
+    Type: String
+    NoEcho: true
+    MinLength: 24
+  SessionSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 24
+  AppBaseUrl:
+    Type: String
+    Default: https://app.assistane.com
+  OwnerEmail:
+    Type: String
+    Default: admin@assistane.com
+  OwnerPasswordHash:
+    Type: String
+    NoEcho: true
+    MinLength: 24
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 30
+    MemorySize: 512
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        ENVIRONMENT_NAME: !Ref EnvironmentName
+        OWNER_USER_ID: owner
+        OWNER_EMAIL: !Ref OwnerEmail
+        OWNER_PASSWORD_HASH: !Ref OwnerPasswordHash
+        OWNER_ADMIN_SECRET: !Ref OwnerAdminSecret
+        DESKTOP_API_KEY: !Ref DesktopApiKey
+        SESSION_SECRET: !Ref SessionSecret
+        APP_BASE_URL: !Ref AppBaseUrl
+        ACCOUNTS_TABLE: !Ref AccountsTable
+        DEVICES_TABLE: !Ref DevicesTable
+        SUPPORT_CODES_TABLE: !Ref SupportCodesTable
+        SESSIONS_TABLE: !Ref SessionsTable
+        MESSAGES_TABLE: !Ref MessagesTable
+        SIGNALS_TABLE: !Ref WebRTCSignalsTable
+        WORKSPACES_TABLE: !Ref WorkspacesTable
+        SUPPORT_CONVERSATIONS_TABLE: !Ref SupportConversationsTable
+        DOWNLOADS_BUCKET: !Ref DownloadsBucket
+
+Resources:
+  AssistaneApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - "*"
+
+  BackendFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: src/handler.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DevicesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SupportCodesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MessagesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WebRTCSignalsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WorkspacesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SupportConversationsTable
+        - S3CrudPolicy:
+            BucketName: !Ref DownloadsBucket
+      Events:
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AssistaneApi
+            Path: /
+            Method: ANY
+        Proxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AssistaneApi
+            Path: /{proxy+}
+            Method: ANY
+
+  AccountsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: username
+          AttributeType: S
+        - AttributeName: account_id
+          AttributeType: S
+        - AttributeName: session_token
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UsernameIndex
+          KeySchema:
+            - AttributeName: username
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: AccountIdIndex
+          KeySchema:
+            - AttributeName: account_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: SessionTokenIndex
+          KeySchema:
+            - AttributeName: session_token
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  DevicesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: registration_token
+          AttributeType: S
+        - AttributeName: device_uid
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: RegistrationTokenIndex
+          KeySchema:
+            - AttributeName: registration_token
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: DeviceUidIndex
+          KeySchema:
+            - AttributeName: device_uid
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  SupportCodesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: short_code
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: ShortCodeIndex
+          KeySchema:
+            - AttributeName: short_code
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  SessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: device_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: DeviceIdIndex
+          KeySchema:
+            - AttributeName: device_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  MessagesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: device_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: DeviceIdIndex
+          KeySchema:
+            - AttributeName: device_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  WebRTCSignalsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: device_id
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: DeviceStatusIndex
+          KeySchema:
+            - AttributeName: device_id
+              KeyType: HASH
+            - AttributeName: status
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  WorkspacesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: owner_id
+          AttributeType: S
+        - AttributeName: domain
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: OwnerIdIndex
+          KeySchema:
+            - AttributeName: owner_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: DomainIndex
+          KeySchema:
+            - AttributeName: domain
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  SupportConversationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  DownloadsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  ApiUrl:
+    Value: !Sub "https://${AssistaneApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  DownloadsBucket:
+    Value: !Ref DownloadsBucket
+

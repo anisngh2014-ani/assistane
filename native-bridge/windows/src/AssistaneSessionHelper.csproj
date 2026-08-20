@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AssistaneSessionHelper</AssemblyName>
+    <RootNamespace>Assistane.NativeBridge</RootNamespace>
+    <StartupObject>Assistane.NativeBridge.SessionHelperProgram</StartupObject>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="SessionHelperProgram.cs" />
+  </ItemGroup>
+</Project>

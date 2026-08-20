@@ -1,0 +1,61 @@
+{
+  "name": "Assistane Native Bridge",
+  "version": 1,
+  "transport": {
+    "windows": {
+      "preferred": "named_pipe",
+      "pipeName": "\\\\.\\pipe\\AssistaneNativeBridge"
+    },
+    "macos": {
+      "preferred": "xpc",
+      "serviceName": "com.assistane.NativeBridge"
+    }
+  },
+  "capabilities": {
+    "captureRecovery": {
+      "required": false,
+      "description": "Report lock/unlock/session transitions so the Electron Viewer can reconnect cleanly."
+    },
+    "secureDesktopAwareness": {
+      "required": false,
+      "description": "Detect active Windows session and expose lock/login transition status where Windows permits."
+    },
+    "privilegedInput": {
+      "required": false,
+      "description": "Prepared future signed helper path for privileged input integration where OS policy permits it."
+    },
+    "driverIntegration": {
+      "required": false,
+      "description": "Future signed display/capture driver integration. Not included in the current Electron build."
+    },
+    "agentWatchdog": {
+      "required": true,
+      "description": "Monitor the visible Electron Agent and ask the installed watchdog task to relaunch it if it crashes."
+    },
+    "sessionHelper": {
+      "required": true,
+      "description": "Launch AssistaneSessionHelper.exe inside the active user session for per-session helper work."
+    },
+    "backgroundStatusHeartbeat": {
+      "required": true,
+      "description": "Write local bridge status heartbeat to ProgramData for Agent diagnostics."
+    }
+  },
+  "messages": {
+    "agentToBridge": [
+      "ping",
+      "get_status",
+      "prepare_session",
+      "end_session",
+      "lock_state_probe",
+      "launch_agent"
+    ],
+    "bridgeToAgent": [
+      "pong",
+      "status",
+      "lock_state_changed",
+      "capture_recovery_requested",
+      "error"
+    ]
+  }
+}

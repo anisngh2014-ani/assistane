@@ -1,0 +1,5 @@
+{
+  "EndpointType": "REGIONAL",
+  "CertificateArn": "arn:aws:acm:us-east-1:339713106066:certificate/6ce10d90-4af4-4203-99df-0c257ace1b70",
+  "SecurityPolicy": "TLS_1_2"
+}

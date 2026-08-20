@@ -1,0 +1,117 @@
+name: Build Assistane Agent
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ASSISTANE_API_BASE_URL: https://api.assistane.com
+  ASSISTANE_DOWNLOADS_BUCKET: assistane-remote-prod-downloadsbucket-mszqgdqc3ygb
+  ASSISTANE_DOWNLOADS_DISTRIBUTION_ID: ${{ secrets.ASSISTANE_DOWNLOADS_DISTRIBUTION_ID }}
+  HAS_AWS_CREDS: ${{ secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' }}
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: electron-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: electron-agent/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build Windows Native Bridge
+        working-directory: native-bridge/windows/src
+        run: |
+          dotnet build AssistaneNativeBridge.csproj -c Release -r win-x64
+          dotnet publish AssistaneNativeBridge.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ..
+          dotnet build AssistaneSessionHelper.csproj -c Release -r win-x64
+          dotnet publish AssistaneSessionHelper.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ..
+      - run: npm ci
+      - name: Create build config
+        run: |
+          node -e "require('fs').writeFileSync('app-config.local.json', JSON.stringify({ API_BASE_URL: process.env.ASSISTANE_API_BASE_URL, API_KEY: process.env.ASSISTANE_API_KEY || '', HEARTBEAT_INTERVAL_MS: 30000 }, null, 2))"
+        env:
+          ASSISTANE_API_KEY: ${{ secrets.ASSISTANE_API_KEY }}
+      - run: npm run rebuild
+        env:
+          PYTHON: ${{ env.pythonLocation }}\python.exe
+      - run: npm run build:win
+        env:
+          PYTHON: ${{ env.pythonLocation }}\python.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: assistane-agent-windows
+          path: electron-agent/dist/Assistane.Agent.Setup.exe
+      - name: Configure AWS credentials
+        if: env.HAS_AWS_CREDS == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Publish Windows Agent to AWS downloads
+        if: env.HAS_AWS_CREDS == 'true'
+        run: |
+          aws s3 cp dist/Assistane.Agent.Setup.exe "s3://$env:ASSISTANE_DOWNLOADS_BUCKET/agent/windows/Assistane.Agent.Setup.exe" --content-type "application/vnd.microsoft.portable-executable"
+      - name: Invalidate AWS download cache
+        if: env.HAS_AWS_CREDS == 'true' && env.ASSISTANE_DOWNLOADS_DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation --distribution-id "$env:ASSISTANE_DOWNLOADS_DISTRIBUTION_ID" --paths "/agent/windows/Assistane.Agent.Setup.exe"
+
+  build-macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: electron-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: electron-agent/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: npm ci
+      - name: Create build config
+        run: |
+          node -e "require('fs').writeFileSync('app-config.local.json', JSON.stringify({ API_BASE_URL: process.env.ASSISTANE_API_BASE_URL, API_KEY: process.env.ASSISTANE_API_KEY || '', HEARTBEAT_INTERVAL_MS: 30000 }, null, 2))"
+        env:
+          ASSISTANE_API_KEY: ${{ secrets.ASSISTANE_API_KEY }}
+      - run: npm run rebuild
+        env:
+          PYTHON: ${{ env.pythonLocation }}/bin/python
+      - run: npm run build:mac
+        env:
+          PYTHON: ${{ env.pythonLocation }}/bin/python
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: assistane-agent-macos
+          path: electron-agent/dist/Assistane.Agent.dmg
+      - name: Configure AWS credentials
+        if: env.HAS_AWS_CREDS == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Publish macOS Agent to AWS downloads
+        if: env.HAS_AWS_CREDS == 'true'
+        run: |
+          aws s3 cp dist/Assistane.Agent.dmg "s3://$ASSISTANE_DOWNLOADS_BUCKET/agent/macos/Assistane.Agent.dmg" --content-type "application/x-apple-diskimage"
+      - name: Invalidate AWS download cache
+        if: env.HAS_AWS_CREDS == 'true' && env.ASSISTANE_DOWNLOADS_DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation --distribution-id "$ASSISTANE_DOWNLOADS_DISTRIBUTION_ID" --paths "/agent/macos/Assistane.Agent.dmg"

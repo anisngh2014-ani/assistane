@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "OwnerAdminSecret",
+    "ParameterValue": "CHANGE_ME_generate_a_long_random_secret"
+  },
+  {
+    "ParameterKey": "DesktopApiKey",
+    "ParameterValue": "CHANGE_ME_generate_a_long_random_desktop_api_key"
+  },
+  {
+    "ParameterKey": "SessionSecret",
+    "ParameterValue": "CHANGE_ME_generate_a_long_random_session_secret"
+  },
+  {
+    "ParameterKey": "AppBaseUrl",
+    "ParameterValue": "https://app.assistane.com"
+  }
+]

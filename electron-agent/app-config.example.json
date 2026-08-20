@@ -1,0 +1,5 @@
+{
+  "API_BASE_URL": "https://api.assistane.com",
+  "API_KEY": "",
+  "HEARTBEAT_INTERVAL_MS": 30000
+}

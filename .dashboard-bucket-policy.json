@@ -1,0 +1,19 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowCloudFrontServicePrincipalReadOnly",
+      "Principal": {
+        "Service": "cloudfront.amazonaws.com"
+      },
+      "Action": "s3:GetObject",
+      "Effect": "Allow",
+      "Condition": {
+        "StringEquals": {
+          "AWS:SourceArn": "arn:aws:cloudfront::339713106066:distribution/E1DWAIOXEAJL57"
+        }
+      },
+      "Resource": "arn:aws:s3:::assistane-remote-prod-dashboard-339713106066-us-east-1/*"
+    }
+  ]
+}

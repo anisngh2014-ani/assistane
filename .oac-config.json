@@ -1,0 +1,7 @@
+{
+  "SigningBehavior": "always",
+  "SigningProtocol": "sigv4",
+  "Description": "Assistane dashboard S3 OAC",
+  "OriginAccessControlOriginType": "s3",
+  "Name": "assistane-dashboard-oac-339713106066"
+}
