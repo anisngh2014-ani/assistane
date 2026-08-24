@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { assistane } from "@/api/assistaneClient";
-import { Monitor, Apple, MonitorDown, Loader2, AlertCircle, CheckCircle2, KeyRound } from "lucide-react";
+import { Monitor, MonitorDown, Loader2, AlertCircle, CheckCircle2, KeyRound } from "lucide-react";
 
 function detectOS() {
   const ua = navigator.userAgent;
@@ -24,7 +24,7 @@ function normalizeSupportCode(value) {
 function statusText(status, os) {
   if (status === "validating") return "Checking support code...";
   if (status === "downloading") return "Download starting automatically...";
-  if (status === "ready") return `${os === "windows" ? "Windows" : "macOS"} detected. Ready to download.`;
+  if (status === "ready") return os === "unknown" ? "Open this page on a Windows or macOS computer." : `${os === "windows" ? "Windows" : "macOS"} detected. Ready to download.`;
   return "Enter the support code from your technician.";
 }
 
@@ -51,7 +51,7 @@ export default function Connect() {
       return;
     }
     if (platform !== "windows" && platform !== "macos") {
-      setError("We could not detect this computer. Choose Windows or macOS below.");
+      setError("We could not detect Windows or macOS on this device. Please open this page from the remote Windows or macOS computer.");
       setStatus("ready");
       return;
     }
@@ -81,7 +81,7 @@ export default function Connect() {
     if (!queryCode || !cleanCode) return;
     if (!canAutoDownload) {
       setStatus("ready");
-      setError("Choose Windows or macOS to download the Agent for this support code.");
+      setError("We could not detect Windows or macOS on this device. Please open this page from the remote Windows or macOS computer.");
       return;
     }
     const timer = setTimeout(() => requestDownload(os, cleanCode), 500);
@@ -131,7 +131,7 @@ export default function Connect() {
             {os === "unknown" && (
               <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200 text-left">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                We could not detect your operating system. Choose the correct installer below.
+                We could not detect Windows or macOS on this device. Open this page from the remote computer that needs the Agent installed.
               </div>
             )}
 
@@ -155,30 +155,6 @@ export default function Connect() {
                 </Button>
               </div>
             </form>
-
-            <div className="flex flex-col gap-3">
-              <Button
-                className="w-full h-12 text-sm gap-2"
-                variant={os === "windows" ? "default" : "secondary"}
-                onClick={() => requestDownload("windows", cleanCode)}
-                disabled={status === "validating" || status === "downloading"}
-              >
-                <MonitorDown className="w-5 h-5" />
-                Download for Windows (.exe)
-                {os === "windows" && <span className="ml-auto text-[10px] bg-primary-foreground/20 px-1.5 py-0.5 rounded">Recommended</span>}
-              </Button>
-
-              <Button
-                className="w-full h-12 text-sm gap-2"
-                variant={os === "macos" ? "default" : "secondary"}
-                onClick={() => requestDownload("macos", cleanCode)}
-                disabled={status === "validating" || status === "downloading"}
-              >
-                <Apple className="w-5 h-5" />
-                Download for macOS (.dmg)
-                {os === "macos" && <span className="ml-auto text-[10px] bg-primary-foreground/20 px-1.5 py-0.5 rounded">Recommended</span>}
-              </Button>
-            </div>
 
             <div className="bg-secondary/60 rounded-xl p-3 text-left space-y-1">
               <p className="text-xs font-semibold">After downloading:</p>
@@ -205,3 +181,4 @@ export default function Connect() {
     </div>
   );
 }
+

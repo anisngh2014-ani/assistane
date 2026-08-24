@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { assistane } from "@/api/assistaneClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Check, RefreshCw, Share2, Zap, Clock, Trash2 } from "lucide-react";
+import { Copy, Check, RefreshCw, Link2, Zap, Clock, Trash2 } from "lucide-react";
 import moment from "moment";
 import { toast } from "@/components/ui/use-toast";
 
@@ -10,7 +10,7 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
   const [codes, setCodes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [label, setLabel] = useState("");
-  const [copied, setCopied] = useState(null); // code string that was copied
+  const [copied, setCopied] = useState(null);
 
   const getAccountCredentials = () => ({
     accountId: accountId || localStorage.getItem("accountId") || localStorage.getItem("accountDbId") || "",
@@ -67,7 +67,6 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
       });
       if (res.data.success) {
         setLabel("");
-        // Optimistically prepend so it appears immediately
         const newCode = {
           id: res.data.code?.id || `temp-${Date.now()}`,
           short_code: res.data.short_code,
@@ -76,7 +75,6 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
           used: false,
         };
         setCodes([newCode]);
-        // Refresh after a short delay to let the DB write propagate
         setTimeout(() => loadCodes(), 1500);
       }
     } catch (err) {
@@ -112,40 +110,28 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
     return /^\d{6}$/.test(value) ? value : "";
   };
 
+  const getSupportLink = (shortCode) => `https://connect.assistane.com/?code=${encodeURIComponent(shortCode)}`;
+
   const copyCode = (shortCode) => {
     if (!shortCode) {
       toast({ title: "Code not ready", description: "Generate a new support code and try again.", variant: "destructive" });
       return;
     }
     navigator.clipboard.writeText(shortCode);
-    setCopied(shortCode);
-    toast({ title: "Code copied!", description: "Paste this 6-digit code into the Agent." });
+    setCopied(`code:${shortCode}`);
+    toast({ title: "Code copied", description: "Share this 6-digit code with your client." });
     setTimeout(() => setCopied(null), 2000);
   };
-
-  const getSupportLink = (shortCode) => `https://connect.assistane.com/?code=${encodeURIComponent(shortCode)}`;
 
   const copyLink = (shortCode) => {
     if (!shortCode) {
       toast({ title: "Code not ready", description: "Generate a new support code and try again.", variant: "destructive" });
       return;
     }
-    const url = getSupportLink(shortCode);
-    navigator.clipboard.writeText(url);
-    setCopied(shortCode);
-    toast({ title: "Support link copied!", description: "Share this link with your client." });
+    navigator.clipboard.writeText(getSupportLink(shortCode));
+    setCopied(`link:${shortCode}`);
+    toast({ title: "Support link copied", description: "Share this link with your client." });
     setTimeout(() => setCopied(null), 2000);
-  };
-
-  const shareLink = (shortCode) => {
-    const url = getSupportLink(shortCode);
-    if (navigator.share) {
-      navigator.share({ title: "Assistane Support", text: `Open this Assistane support link to download the correct Agent installer for support code ${shortCode}.`, url });
-      setCopied(shortCode);
-      setTimeout(() => setCopied(null), 2000);
-    } else {
-      copyLink(shortCode);
-    }
   };
 
   return (
@@ -158,7 +144,6 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
         Generate a 6-digit support code to share with your client. They can open the support link or visit connect.assistane.com, enter the code, and download the correct Agent installer.
       </p>
 
-      {/* Create */}
       <div className="flex gap-2">
         <Input
           value={label}
@@ -172,7 +157,6 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
         </Button>
       </div>
 
-      {/* Active codes */}
       {codes.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-4">No active codes. Generate one above.</p>
       ) : (
@@ -180,33 +164,34 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
           {codes.map((c) => {
             const shortCode = getShortCode(c);
             return (
-            <div key={c.id} className="flex items-center gap-3 bg-secondary/60 rounded-lg px-3 py-2.5">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-base text-foreground tracking-widest">{shortCode || "------"}</span>
-                  {c.label && <span className="text-xs text-muted-foreground truncate">{c.label}</span>}
+              <div key={c.id} className="flex items-center gap-3 bg-secondary/60 rounded-lg px-3 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-base text-foreground tracking-widest">{shortCode || "------"}</span>
+                    {c.label && <span className="text-xs text-muted-foreground truncate">{c.label}</span>}
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+                    <Clock className="w-3 h-3" />
+                    Expires {moment(c.expires_at).fromNow()}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
-                  <Clock className="w-3 h-3" />
-                  Expires {moment(c.expires_at).fromNow()}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyCode(shortCode)} title="Copy 6-digit code" disabled={!shortCode}>
+                    {copied === `code:${shortCode}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] gap-1" onClick={() => copyLink(shortCode)} title="Copy support link" disabled={!shortCode}>
+                    {copied === `link:${shortCode}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Link2 className="w-3.5 h-3.5" />}
+                    Copy Link
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteCode(c.id)} title="Delete">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyCode(shortCode)} title="Copy 6-digit code" disabled={!shortCode}>
-                  {copied === shortCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => shareLink(shortCode)} title="Share support link" disabled={!shortCode}>
-                  <Share2 className="w-3.5 h-3.5" />
-                </Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteCode(c.id)} title="Delete">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </div>
-          )})}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
-
