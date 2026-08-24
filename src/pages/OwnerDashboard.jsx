@@ -411,7 +411,7 @@ export default function OwnerDashboard() {
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setShowOwnerPasswordModal(true)}>
             <Lock className="w-3.5 h-3.5" />
-            Change Password
+            Change Login Password
           </Button>
           <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setShowCreateUser(true)}>
             <Plus className="w-3.5 h-3.5" />
@@ -450,8 +450,8 @@ export default function OwnerDashboard() {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <form onSubmit={handleOwnerPasswordChange} className="bg-card border border-border rounded-xl max-w-sm w-full p-6 space-y-4">
             <div>
-              <h2 className="font-semibold text-lg">Change Owner Password</h2>
-              <p className="text-muted-foreground text-sm">Update the password used for owner login.</p>
+              <h2 className="font-semibold text-lg">Change Owner Login Password</h2>
+              <p className="text-muted-foreground text-sm">Update the password used for owner/admin login.</p>
             </div>
             <div>
               <label className="text-xs font-medium">Current Password</label>
