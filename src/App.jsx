@@ -31,6 +31,18 @@ import ViewerDownload from '@/pages/ViewerDownload';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const isConnectHost = window.location.hostname.toLowerCase() === "connect.assistane.com";
+
+  if (isConnectHost) {
+    return (
+      <Routes>
+        <Route path="/" element={<Connect />} />
+        <Route path="/connect" element={<Navigate to="/" replace />} />
+        <Route path="/download-agent" element={<DownloadAgent />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
   const publicPaths = [
     "/login",
     "/register",

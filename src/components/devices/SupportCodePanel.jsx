@@ -123,22 +123,24 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
     setTimeout(() => setCopied(null), 2000);
   };
 
+  const getSupportLink = (shortCode) => `https://connect.assistane.com/?code=${encodeURIComponent(shortCode)}`;
+
   const copyLink = (shortCode) => {
     if (!shortCode) {
       toast({ title: "Code not ready", description: "Generate a new support code and try again.", variant: "destructive" });
       return;
     }
-    const url = `${window.location.origin}/connect`;
+    const url = getSupportLink(shortCode);
     navigator.clipboard.writeText(url);
     setCopied(shortCode);
-    toast({ title: "Download link copied!", description: "Share this link plus the 6-digit code with your client." });
+    toast({ title: "Support link copied!", description: "Share this link with your client." });
     setTimeout(() => setCopied(null), 2000);
   };
 
   const shareLink = (shortCode) => {
-    const url = `${window.location.origin}/connect`;
+    const url = getSupportLink(shortCode);
     if (navigator.share) {
-      navigator.share({ title: "Assistane Agent Download", text: `Download Assistane Agent, then enter support code ${shortCode}.`, url });
+      navigator.share({ title: "Assistane Support", text: `Open this Assistane support link and enter support code ${shortCode} if prompted.`, url });
       setCopied(shortCode);
       setTimeout(() => setCopied(null), 2000);
     } else {
