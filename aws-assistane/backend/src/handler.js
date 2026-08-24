@@ -30,6 +30,19 @@ const OWNER_USER_ID = process.env.OWNER_USER_ID || "owner";
 const OWNER_EMAIL = process.env.OWNER_EMAIL || "admin@assistane.com";
 const OWNER_PASSWORD_HASH = process.env.OWNER_PASSWORD_HASH || "";
 const DEVICE_STALE_MS = 120 * 1000;
+const CONNECT_BASE_URL = process.env.CONNECT_BASE_URL || "https://connect.assistane.com";
+const DOWNLOAD_KEYS = {
+  windows: {
+    key: "agent/windows/Assistane.Agent.Setup.exe",
+    filename: (code) => `Assistane.Agent.Setup.${code}.exe`,
+    contentType: "application/vnd.microsoft.portable-executable",
+  },
+  macos: {
+    key: "agent/macos/Assistane.Agent.dmg",
+    filename: (code) => `Assistane.Agent.${code}.dmg`,
+    contentType: "application/x-apple-diskimage",
+  },
+};
 
 function json(statusCode, body) {
   return {
@@ -92,6 +105,66 @@ function makeSupportCode() {
 
 function makeToken(bytes = 32) {
   return crypto.randomBytes(bytes).toString("hex");
+}
+
+function awsUriEncode(value, encodeSlash = true) {
+  return encodeURIComponent(String(value))
+    .replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%2F/g, encodeSlash ? "%2F" : "/");
+}
+
+function hmac(key, value, encoding) {
+  return crypto.createHmac("sha256", key).update(value, "utf8").digest(encoding);
+}
+
+function sha256(value) {
+  return crypto.createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function signingKey(secretAccessKey, dateStamp, region, service) {
+  const kDate = hmac(`AWS4${secretAccessKey}`, dateStamp);
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  return hmac(kService, "aws4_request");
+}
+
+function canonicalQuery(params) {
+  return Object.keys(params)
+    .sort()
+    .map((key) => `${awsUriEncode(key)}=${awsUriEncode(params[key])}`)
+    .join("&");
+}
+
+function createS3PresignedGetUrl({ bucket, key, filename, contentType, expiresInSeconds = 300 }) {
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  const sessionToken = process.env.AWS_SESSION_TOKEN;
+  const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
+  if (!accessKeyId || !secretAccessKey) throw new Error("AWS signing credentials are not available");
+
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const dateStamp = amzDate.slice(0, 8);
+  const service = "s3";
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const host = `${bucket}.s3.${region}.amazonaws.com`;
+  const canonicalUri = `/${awsUriEncode(key, false)}`;
+  const params = {
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": `${accessKeyId}/${credentialScope}`,
+    "X-Amz-Date": amzDate,
+    "X-Amz-Expires": String(expiresInSeconds),
+    "X-Amz-SignedHeaders": "host",
+    "response-content-disposition": `attachment; filename="${filename}"`,
+    "response-content-type": contentType,
+  };
+  if (sessionToken) params["X-Amz-Security-Token"] = sessionToken;
+
+  const query = canonicalQuery(params);
+  const canonicalRequest = ["GET", canonicalUri, query, `host:${host}\n`, "host", "UNSIGNED-PAYLOAD"].join("\n");
+  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, credentialScope, sha256(canonicalRequest)].join("\n");
+  const signature = hmac(signingKey(secretAccessKey, dateStamp, region, service), stringToSign, "hex");
+  return `https://${host}${canonicalUri}?${query}&X-Amz-Signature=${signature}`;
 }
 
 function hashPassword(password) {
@@ -403,6 +476,73 @@ async function handleEntity(body, headers) {
 
   return json(400, { success: false, error: `Unsupported entity action ${action}` });
 }
+function normalizePlatform(value) {
+  const raw = String(value || "").toLowerCase();
+  if (["win", "windows", "win32"].includes(raw)) return "windows";
+  if (["mac", "macos", "darwin", "osx"].includes(raw)) return "macos";
+  return "";
+}
+
+function isSupportCodeActive(code) {
+  if (!code || code.used === true) return false;
+  const expiresAt = Date.parse(code.expires_at || "");
+  return Number.isFinite(expiresAt) && expiresAt > Date.now();
+}
+
+function publicSupportCode(code) {
+  if (!code) return null;
+  return {
+    short_code: code.short_code,
+    label: code.label || "",
+    expires_at: code.expires_at || "",
+  };
+}
+
+async function findActiveSupportCode(rawCode) {
+  const shortCode = numericCodeFrom(rawCode);
+  if (!/^\d{6}$/.test(shortCode)) return { error: "Enter a valid 6-digit support code", status: 400 };
+  const code = (await query(TABLES.supportCodes, "ShortCodeIndex", "short_code", shortCode))[0];
+  if (!isSupportCodeActive(code)) return { error: "Invalid or expired support code", status: 404 };
+  return { code, shortCode };
+}
+
+async function handleValidateSupportCode(body) {
+  const found = await findActiveSupportCode(body.code || body.support_code || body.pairing_token);
+  if (found.error) return json(found.status, { success: false, error: found.error });
+  return json(200, {
+    success: true,
+    short_code: found.shortCode,
+    support_code: publicSupportCode(found.code),
+  });
+}
+
+async function handleAgentBootstrapDownload(body) {
+  const found = await findActiveSupportCode(body.code || body.support_code || body.pairing_token);
+  if (found.error) return json(found.status, { success: false, error: found.error });
+
+  const platform = normalizePlatform(body.platform || body.os);
+  const download = DOWNLOAD_KEYS[platform];
+  if (!download) return json(400, { success: false, error: "Choose Windows or macOS" });
+  if (!process.env.DOWNLOADS_BUCKET) return json(500, { success: false, error: "Downloads bucket is not configured" });
+
+  const filename = download.filename(found.shortCode);
+  const downloadUrl = createS3PresignedGetUrl({
+    bucket: process.env.DOWNLOADS_BUCKET,
+    key: download.key,
+    filename,
+    contentType: download.contentType,
+    expiresInSeconds: 5 * 60,
+  });
+  return json(200, {
+    success: true,
+    platform,
+    short_code: found.shortCode,
+    filename,
+    download_url: downloadUrl,
+    expires_in_seconds: 300,
+  });
+}
+
 async function closeActiveSupportCodes(userId) {
   const codes = await query(TABLES.supportCodes, "UserIdIndex", "user_id", userId);
   await Promise.all(
@@ -544,7 +684,7 @@ async function handleSupportCodeCreate(body, headers) {
     success: true,
     code,
     short_code: shortCode,
-    support_link: `${process.env.APP_BASE_URL || "https://app.assistane.com"}/connect?code=${shortCode}`,
+    support_link: `${CONNECT_BASE_URL}/?code=${shortCode}`,
   });
 }
 
@@ -867,11 +1007,13 @@ async function route(event) {
     return json(200, { success: true });
   }
 
+  if (path === "validate-support-code" || path === "install-session") return handleValidateSupportCode(body);
+  if (path === "agent-bootstrap-download") return handleAgentBootstrapDownload(body);
   if (["generate-support-code", "support-code"].includes(path)) return handleSupportCodeCreate(body, headers);
   if (path === "support-codes" || path === "active-support-codes") return handleSupportCodesList(body, headers);
   if (path === "resolve-support-code") {
     const code = (await query(TABLES.supportCodes, "ShortCodeIndex", "short_code", numericCodeFrom(body.code)))[0];
-    return json(200, { success: !!code && code.used !== true, code });
+    return json(200, { success: isSupportCodeActive(code), code: publicSupportCode(code) });
   }
   if (path === "revoke-support-code" || path === "expire-support-code") {
     await update(TABLES.supportCodes, body.id, { used: true, used_at: nowIso() });
@@ -953,4 +1095,8 @@ exports.handler = async (event) => {
     return json(500, { success: false, error: err.message || "Internal server error" });
   }
 };
+
+
+
+
 

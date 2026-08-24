@@ -140,7 +140,7 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
   const shareLink = (shortCode) => {
     const url = getSupportLink(shortCode);
     if (navigator.share) {
-      navigator.share({ title: "Assistane Support", text: `Open this Assistane support link and enter support code ${shortCode} if prompted.`, url });
+      navigator.share({ title: "Assistane Support", text: `Open this Assistane support link to download the correct Agent installer for support code ${shortCode}.`, url });
       setCopied(shortCode);
       setTimeout(() => setCopied(null), 2000);
     } else {
@@ -155,7 +155,7 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
         <h3 className="font-heading font-semibold text-sm">Support Codes</h3>
       </div>
       <p className="text-xs text-muted-foreground">
-        Generate a 6-digit support code to share with your client. They open the Agent download link, install the Agent, then enter this code inside the Agent.
+        Generate a 6-digit support code to share with your client. They can open the support link or visit connect.assistane.com, enter the code, and download the correct Agent installer.
       </p>
 
       {/* Create */}
@@ -209,3 +209,4 @@ export default function SupportCodePanel({ accountId = null, accountToken = null
     </div>
   );
 }
+

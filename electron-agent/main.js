@@ -382,7 +382,52 @@ async function resolveSupportCodeIfPossible(pairingToken) {
   return normalized;
 }
 
+function readArgPairingToken() {
+  for (const arg of process.argv || []) {
+    const match = String(arg || "").match(/^(?:--code=|--token=|\/token=)(.+)$/i);
+    if (!match) continue;
+    const token = normalizePairingInput(match[1]);
+    if (/^\d{6}$/.test(token)) return token;
+  }
+  return null;
+}
+
+function readDownloadedInstallerPairingToken() {
+  const dirs = [...new Set([
+    app.getPath("downloads"),
+    path.join(os.homedir() || "", "Downloads"),
+  ].filter(Boolean))];
+  const cutoffMs = Date.now() - 48 * 60 * 60 * 1000;
+  const matches = [];
+
+  for (const dir of dirs) {
+    try {
+      if (!fs.existsSync(dir)) continue;
+      for (const name of fs.readdirSync(dir)) {
+        const match = String(name || "").match(/Assistane[.\s_-]*Agent.*?(\d{6}).*\.(exe|dmg|pkg|zip)$/i);
+        if (!match) continue;
+        const filePath = path.join(dir, name);
+        const stat = fs.statSync(filePath);
+        if (!stat.isFile() || stat.mtimeMs < cutoffMs) continue;
+        matches.push({ token: match[1], mtimeMs: stat.mtimeMs, filePath });
+      }
+    } catch (err) {
+      console.warn("[pair] Could not inspect downloaded Agent installers:", err.message);
+    }
+  }
+
+  matches.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  if (matches[0]) {
+    console.log(`[pair] Found support code in downloaded installer filename: ${path.basename(matches[0].filePath)}`);
+    return matches[0].token;
+  }
+  return null;
+}
+
 function readInstallerPairingToken() {
+  const argToken = readArgPairingToken();
+  if (argToken) return argToken;
+
   const candidates = [
     path.join(app.getPath("userData"), "pairing_token.txt"),          // preferred (userData)
     path.join(process.env.APPDATA || "", "Assistane Agent", "pairing_token.txt"), // NSIS fallback
@@ -394,12 +439,15 @@ function readInstallerPairingToken() {
       if (fs.existsSync(p)) {
         const token = fs.readFileSync(p, "utf8").trim();
         if (token.length > 0) {
-          fs.unlinkSync(p); // consume the file so it can't be re-used
+          fs.unlinkSync(p); // consume the file so it cannot be reused locally
           return token;
         }
       }
     } catch (_) {}
   }
+
+  const downloadedToken = readDownloadedInstallerPairingToken();
+  if (downloadedToken) return downloadedToken;
   return null;
 }
 
@@ -1504,3 +1552,5 @@ app.on("before-quit", () => {
   // Normal app quit/shutdown keeps the saved registration. The dashboard will
   // only mark offline on explicit uninstall or heartbeat timeout.
 });
+
+
