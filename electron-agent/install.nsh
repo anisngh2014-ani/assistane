@@ -11,16 +11,7 @@ Var /GLOBAL PairingToken
 ${GetParameters} $R0
 ${GetOptions} $R0 "/token=" $PairingToken
 
-StrCmp $PairingToken "" try_filename_token write_token
-
-try_filename_token:
-  ; If the web page downloaded this installer as Assistane.Agent.Setup.123456.exe,
-  ; extract that code and save it for first launch.
-  CreateDirectory "$APPDATA\Assistane Agent"
-  ExecWait 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$$n=[IO.Path]::GetFileName(''$EXEPATH''); $$m=[regex]::Match($$n,''(?<!\d)(\d{6})(?!\d)''); if($$m.Success){ Set-Content -LiteralPath ''$APPDATA\Assistane Agent\pairing_token.txt'' -Value $$m.Groups[1].Value -NoNewline -Encoding ASCII }"'
-  Goto skip_token
-
-write_token:
+StrCmp $PairingToken "" skip_token
   CreateDirectory "$APPDATA\Assistane Agent"
   FileOpen $0 "$APPDATA\Assistane Agent\pairing_token.txt" w
   FileWrite $0 $PairingToken
@@ -69,4 +60,5 @@ ExecWait 'sc.exe stop "AssistaneNativeBridge"'
 ExecWait 'sc.exe delete "AssistaneNativeBridge"'
 
 !macroend
+
 
